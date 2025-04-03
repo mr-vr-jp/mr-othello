@@ -5123,14 +5123,54 @@
         bgm.play();
       });
       
+      // 初期環境の配置
+      placeInitialEnvironment();
+      
       // ローディング画面を非表示
       setTimeout(() => {
         if (loadingUI) loadingUI.style.display = 'none';
-        placeInitialEnvironment();
       }, 1500);
       
       // アニメーションループを開始
       renderer.setAnimationLoop(renderFrame);
+    }
+
+    // 初期環境配置
+    function placeInitialEnvironment() {
+      // 難易度選択メニューを作成して目の前に配置
+      difficultyMenu = createDifficultyMenu();
+      difficultyMenu.position.set(0, 1.3, -1.1);
+      difficultyMenu.userData.faceCamera = true;
+      scene.add(difficultyMenu);
+      difficultySelected = false;
+      
+      // お出迎えパーティクルエフェクトを追加
+      createWelcomeEffect();
+      
+      // 効果音
+      playSound('start');
+      
+      // 盤面の作成と配置
+      board = createBoard();
+      board.position.set(0, 1, 0);
+      board.userData = {
+        fadeIn: true,
+        fadeProgress: 0,
+        fadeSpeed: 0.02,
+        initialY: 1.5,
+        targetY: 1,
+        rotationProgress: 0,
+        glowIntensity: 0,
+        glowDirection: 1
+      };
+      scene.add(board);
+      
+      // 盤面のベースメッシュを保存（衝突判定用）
+      board.traverse((child) => {
+        if (child.name === 'boardBase') {
+          boardBase = child;
+        }
+      });
     }
 
     // マウスクリックイベントの処理
