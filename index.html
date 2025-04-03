@@ -1280,7 +1280,7 @@
       scene.add(difficultyMenu);
       difficultySelected = false;
       
-      // お出迎えパーティクルエフェクトを追加（これは残す）
+      // お出迎けパーティクルエフェクトを追加（これは残す）
       createWelcomeEffect();
       
       // 効果音
@@ -3567,247 +3567,119 @@
         const trunkGeometry = new THREE.CylinderGeometry(0.015, 0.025, 0.08, 8);
         const trunkMaterial = new THREE.MeshStandardMaterial({ 
           color: 0x6d4c33, // より明るい茶色
-          roughness: 0.4,
-          metalness: 0.25
+          roughness: 0.7,
+          metalness: 0.1
         });
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
         treeGroup.add(trunk);
         
-        // 自然な木の葉と枝を作成
-        createDetailedBranchesAndLeaves(treeGroup);
-        
-        // 根元に石や苔を配置
-        const baseDecoration = new THREE.Group();
-        
-        // 小さな石をランダムに配置
-        for (let i = 0; i < 5; i++) {
-          const stoneSize = 0.006 + Math.random() * 0.008;
-          const stoneGeom = new THREE.DodecahedronGeometry(stoneSize, 0);
-          const stoneMat = new THREE.MeshStandardMaterial({
-            color: 0x888888,
+        // メイン枝と葉の構造を作成
+        const createBranchWithLeaves = (length, thickness, branchColor, leafColor, complexity) => {
+          const branchGroup = new THREE.Group();
+          
+          // 枝の作成
+          const branchGeometry = new THREE.CylinderGeometry(thickness * 0.6, thickness, length, 5);
+          const branchMaterial = new THREE.MeshStandardMaterial({
+            color: branchColor,
             roughness: 0.8,
             metalness: 0.05
           });
           
-          const stone = new THREE.Mesh(stoneGeom, stoneMat);
-          stone.position.set(
-            (Math.random() - 0.5) * 0.04,
-            -0.05,
-            (Math.random() - 0.5) * 0.04
+          // 枝のメッシュを作成し少し回転
+          const branch = new THREE.Mesh(branchGeometry, branchMaterial);
+          branch.rotation.x = Math.PI / 2; // 水平方向に向ける
+          branchGroup.add(branch);
+          
+          // 枝の先端位置
+          const tipPosition = new THREE.Vector3(length, 0, 0);
+          
+          // 葉っぱをつける
+          const leafCount = Math.floor(complexity * 8); // 複雑さに応じた葉の数
+          for(let i = 0; i < leafCount; i++) {
+            // 葉の基本形状（平面）
+            const leafSize = 0.01 + Math.random() * 0.007;
+            const leafGeometry = new THREE.PlaneGeometry(leafSize, leafSize * 1.5);
+            
+            // 葉の色にランダム性を加える
+            const leafMat = new THREE.MeshStandardMaterial({
+              color: new THREE.Color(leafColor).offsetHSL(0, 0, (Math.random() - 0.5) * 0.1),
+              roughness: 0.7,
+              metalness: 0.05,
+              side: THREE.DoubleSide
+            });
+            
+            const leaf = new THREE.Mesh(leafGeometry, leafMat);
+            
+            // 葉を枝に沿ってランダムに配置
+            const leafPosition = Math.random() * 0.7 + 0.3; // 枝の30%～100%の位置に配置
+            leaf.position.set(length * leafPosition, 0, 0);
+            
+            // 葉をランダムに回転
+            leaf.rotation.z = Math.random() * Math.PI * 2;
+            leaf.rotation.y = Math.random() * Math.PI / 4;
+            leaf.rotation.x = Math.random() * Math.PI / 4;
+            
+            branch.add(leaf);
+          }
+          
+          // 小枝の再帰的作成（複雑さに応じて）
+          if (complexity > 1) {
+            const subBranchCount = Math.floor(Math.random() * 2) + 1;
+            for (let i = 0; i < subBranchCount; i++) {
+              const subLength = length * (0.4 + Math.random() * 0.3);
+              const subThickness = thickness * 0.6;
+              const subBranch = createBranchWithLeaves(
+                subLength, 
+                subThickness, 
+                branchColor,
+                leafColor,
+                complexity - 1
+              );
+              
+              // 小枝の位置決め（親枝の中間～先端付近）
+              const branchPos = 0.5 + Math.random() * 0.45;
+              subBranch.position.set(length * branchPos, 0, 0);
+              
+              // 小枝の角度をランダムに設定
+              subBranch.rotation.z = (Math.random() - 0.5) * Math.PI * 0.2;
+              subBranch.rotation.y = Math.random() * Math.PI * 2;
+              
+              branch.add(subBranch);
+            }
+          }
+          
+          return branchGroup;
+        };
+        
+        // メインの枝を幹から伸ばす
+        const mainBranchCount = 7;
+        const mainBranchColor = 0x5a3d28;
+        const leafColor = 0x4a8038;
+        
+        for (let i = 0; i < mainBranchCount; i++) {
+          const height = 0.02 + i * 0.01; // 枝の高さを少しずつ上げる
+          const angle = i * Math.PI * 2 / mainBranchCount;
+          const complexity = 3 - Math.floor(i / 3); // 下の枝ほど複雑に
+          
+          const mainBranch = createBranchWithLeaves(
+            0.05 + Math.random() * 0.02, // 長さ
+            0.005, // 太さ
+            mainBranchColor,
+            leafColor,
+            complexity
           );
-          stone.rotation.set(
-            Math.random() * Math.PI,
-            Math.random() * Math.PI,
-            Math.random() * Math.PI
-          );
-          baseDecoration.add(stone);
+          
+          mainBranch.position.y = height;
+          mainBranch.rotation.y = angle;
+          mainBranch.rotation.z = Math.PI / 6 + (Math.random() - 0.5) * Math.PI * 0.1;
+          
+          treeGroup.add(mainBranch);
         }
         
-        // 根元に苔を少し追加
-        for (let i = 0; i < 4; i++) {
-          const mossGeom = new THREE.CircleGeometry(0.01 + Math.random() * 0.01, 5);
-          const mossColor = new THREE.Color(0x1d5e1b);
-          mossColor.r += (Math.random() - 0.5) * 0.1;
-          mossColor.g += (Math.random() - 0.5) * 0.1;
-          
-          const mossMat = new THREE.MeshStandardMaterial({
-            color: mossColor,
-            roughness: 0.9,
-            side: THREE.DoubleSide
-          });
-          
-          const moss = new THREE.Mesh(mossGeom, mossMat);
-          moss.rotation.x = -Math.PI / 2;
-          moss.position.set(
-            (Math.random() - 0.5) * 0.04,
-            -0.049 + Math.random() * 0.002,
-            (Math.random() - 0.5) * 0.04
-          );
-          baseDecoration.add(moss);
-        }
-        
-        treeGroup.add(baseDecoration);
-        
-        // スケールを大きくする
-        treeGroup.scale.set(1.1, 1.2, 1.1);
+        // スケールを調整
+        treeGroup.scale.set(1.2, 1.2, 1.2);
         
         return treeGroup;
-      }
-      
-      // 細かい枝と葉を生成する関数
-      function createDetailedBranchesAndLeaves(parentGroup) {
-        // メイン枝のパラメータ
-        const mainBranches = [
-          { angle: 0.2, height: 0.03, length: 0.05, size: 0.008 },
-          { angle: 1.2, height: 0.05, length: 0.045, size: 0.007 },
-          { angle: 2.3, height: 0.04, length: 0.048, size: 0.0075 },
-          { angle: 3.5, height: 0.06, length: 0.052, size: 0.008 },
-          { angle: 4.7, height: 0.035, length: 0.044, size: 0.007 }
-        ];
-        
-        // メイン枝を生成
-        mainBranches.forEach(branch => {
-          const branchGroup = new THREE.Group();
-          
-          // 枝の作成
-          const branchGeom = new THREE.CylinderGeometry(branch.size * 0.6, branch.size, branch.length, 6);
-          const branchMat = new THREE.MeshStandardMaterial({
-            color: 0x5a4030,
-            roughness: 0.7,
-            metalness: 0.1
-          });
-          
-          const branchMesh = new THREE.Mesh(branchGeom, branchMat);
-          // 枝を水平方向に傾ける
-          branchMesh.rotation.z = Math.PI / 2;
-          // 枝の位置を設定
-          branchMesh.position.x = branch.length / 2;
-          
-          branchGroup.add(branchMesh);
-          
-          // 各メイン枝に葉のクラスターを追加
-          const leafClusterCount = 3 + Math.floor(Math.random() * 3);
-          for (let i = 0; i < leafClusterCount; i++) {
-            const leafCluster = createLeafCluster();
-            const pos = i / leafClusterCount;
-            leafCluster.position.x = branch.length * (0.3 + pos * 0.7); // 枝の中間から先端に向けて配置
-            leafCluster.position.y = (Math.random() - 0.5) * 0.01;
-            leafCluster.position.z = (Math.random() - 0.5) * 0.01;
-            leafCluster.rotation.set(
-              Math.random() * Math.PI,
-              Math.random() * Math.PI,
-              Math.random() * Math.PI
-            );
-            leafCluster.scale.set(0.8, 0.8, 0.8);
-            branchGroup.add(leafCluster);
-          }
-          
-          // サブ枝を追加（メイン枝から派生する小枝）
-          const subBranchCount = 1 + Math.floor(Math.random() * 2);
-          for (let i = 0; i < subBranchCount; i++) {
-            const subBranchGroup = new THREE.Group();
-            const subBranchLength = branch.length * 0.4;
-            const subBranchSize = branch.size * 0.6;
-            
-            const subBranchGeom = new THREE.CylinderGeometry(subBranchSize * 0.6, subBranchSize, subBranchLength, 5);
-            const subBranchMesh = new THREE.Mesh(subBranchGeom, branchMat);
-            
-            subBranchMesh.rotation.z = Math.PI / 2;
-            subBranchMesh.position.x = subBranchLength / 2;
-            subBranchGroup.add(subBranchMesh);
-            
-            // サブ枝に葉を追加
-            const subLeafCluster = createLeafCluster();
-            subLeafCluster.position.x = subBranchLength * 0.8;
-            subLeafCluster.scale.set(0.7, 0.7, 0.7);
-            subBranchGroup.add(subLeafCluster);
-            
-            // サブ枝をメイン枝に取り付ける
-            subBranchGroup.position.x = branch.length * (0.3 + Math.random() * 0.5);
-            subBranchGroup.rotation.y = Math.PI * (Math.random() - 0.5) * 0.8;
-            subBranchGroup.rotation.z = Math.random() * Math.PI * 0.4 - Math.PI * 0.2;
-            branchGroup.add(subBranchGroup);
-          }
-          
-          // 枝グループを親に取り付ける
-          branchGroup.position.y = branch.height;
-          branchGroup.rotation.y = Math.PI * 2 * branch.angle;
-          parentGroup.add(branchGroup);
-        });
-        
-        // 木の上部に葉のクラスターを追加
-        const topLeafClusters = new THREE.Group();
-        for (let i = 0; i < 10; i++) {
-          const leafCluster = createLeafCluster();
-          leafCluster.position.set(
-            (Math.random() - 0.5) * 0.04,
-            0.07 + Math.random() * 0.03,
-            (Math.random() - 0.5) * 0.04
-          );
-          leafCluster.rotation.set(
-            Math.random() * Math.PI,
-            Math.random() * Math.PI,
-            Math.random() * Math.PI
-          );
-          
-          // ランダムなスケール
-          const scale = 0.7 + Math.random() * 0.4;
-          leafCluster.scale.set(scale, scale, scale);
-          
-          topLeafClusters.add(leafCluster);
-        }
-        parentGroup.add(topLeafClusters);
-      }
-      
-      // 葉のクラスターを作成する関数
-      function createLeafCluster() {
-        const leafGroup = new THREE.Group();
-        
-        // 葉の枚数
-        const leafCount = 5 + Math.floor(Math.random() * 4);
-        
-        // 葉の色（少しばらつきをもたせる）
-        const baseColor = new THREE.Color(0x2d5e29);
-        
-        for (let i = 0; i < leafCount; i++) {
-          // 個々の葉の形状（細長い楕円形）
-          const leafShape = new THREE.Shape();
-          const leafLength = 0.015 + Math.random() * 0.01;
-          const leafWidth = 0.005 + Math.random() * 0.003;
-          
-          // 葉の形状を定義（先端が尖った楕円）
-          leafShape.moveTo(0, -leafWidth / 2);
-          leafShape.quadraticCurveTo(
-            leafLength * 0.7, -leafWidth / 2,
-            leafLength, 0
-          );
-          leafShape.quadraticCurveTo(
-            leafLength * 0.7, leafWidth / 2,
-            0, leafWidth / 2
-          );
-          leafShape.lineTo(0, -leafWidth / 2);
-          
-          // 葉の厚み
-          const extrudeSettings = {
-            steps: 1,
-            depth: 0.001,
-            bevelEnabled: false
-          };
-          
-          const leafGeom = new THREE.ExtrudeGeometry(leafShape, extrudeSettings);
-          
-          // 葉の色をわずかにランダム化
-          const leafColor = baseColor.clone();
-          leafColor.r += (Math.random() - 0.5) * 0.1;
-          leafColor.g += (Math.random() - 0.5) * 0.1;
-          leafColor.b += (Math.random() - 0.5) * 0.05;
-          
-          const leafMat = new THREE.MeshStandardMaterial({
-            color: leafColor,
-            roughness: 0.8,
-            metalness: 0.1,
-            side: THREE.DoubleSide
-          });
-          
-          const leaf = new THREE.Mesh(leafGeom, leafMat);
-          
-          // 葉をランダムな向きに配置
-          leaf.position.set(
-            (Math.random() - 0.5) * 0.01,
-            (Math.random() - 0.5) * 0.01,
-            (Math.random() - 0.5) * 0.01
-          );
-          
-          leaf.rotation.set(
-            Math.random() * Math.PI,
-            Math.random() * Math.PI,
-            Math.random() * Math.PI
-          );
-          
-          leafGroup.add(leaf);
-        }
-        
-        return leafGroup;
       }
       
       // 草 - 草の数を指定できるように変更
@@ -3844,256 +3716,425 @@
         { create: createLargePineTree, position: new THREE.Vector3(-0.32, 0, 0.32) }      // 左下: 大きめの松
       ];
       
-      // 大きめの松の木（左下用）- サイズと色も変えたバージョン
-      function createLargePineTree() {
-        const treeGroup = new THREE.Group();
-        
-        // 太い幹
-        const trunkGeometry = new THREE.CylinderGeometry(0.015, 0.025, 0.08, 8);
-        const trunkMaterial = new THREE.MeshStandardMaterial({ 
-          color: 0x6d4c33, // より明るい茶色
-          roughness: 0.4,
-          metalness: 0.25
+      // 装飾の追加（草は木の根元に追加済みなので別途追加しない）
+      decorations.forEach(decoration => {
+        const obj = decoration.create();
+        obj.position.copy(decoration.position);
+        // 装飾オブジェクトに影を設定
+        obj.traverse(child => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
         });
-        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-        treeGroup.add(trunk);
-        
-        // 自然な木の葉と枝を作成
-        createDetailedBranchesAndLeaves(treeGroup);
-        
-        // 根元に石や苔を配置
-        const baseDecoration = new THREE.Group();
-        
-        // 小さな石をランダムに配置
-        for (let i = 0; i < 5; i++) {
-          const stoneSize = 0.006 + Math.random() * 0.008;
-          const stoneGeom = new THREE.DodecahedronGeometry(stoneSize, 0);
-          const stoneMat = new THREE.MeshStandardMaterial({
-            color: 0x888888,
-            roughness: 0.8,
-            metalness: 0.05
-          });
-          
-          const stone = new THREE.Mesh(stoneGeom, stoneMat);
-          stone.position.set(
-            (Math.random() - 0.5) * 0.04,
-            -0.05,
-            (Math.random() - 0.5) * 0.04
-          );
-          stone.rotation.set(
-            Math.random() * Math.PI,
-            Math.random() * Math.PI,
-            Math.random() * Math.PI
-          );
-          baseDecoration.add(stone);
-        }
-        
-        // 根元に苔を少し追加
-        for (let i = 0; i < 4; i++) {
-          const mossGeom = new THREE.CircleGeometry(0.01 + Math.random() * 0.01, 5);
-          const mossColor = new THREE.Color(0x1d5e1b);
-          mossColor.r += (Math.random() - 0.5) * 0.1;
-          mossColor.g += (Math.random() - 0.5) * 0.1;
-          
-          const mossMat = new THREE.MeshStandardMaterial({
-            color: mossColor,
-            roughness: 0.9,
-            side: THREE.DoubleSide
-          });
-          
-          const moss = new THREE.Mesh(mossGeom, mossMat);
-          moss.rotation.x = -Math.PI / 2;
-          moss.position.set(
-            (Math.random() - 0.5) * 0.04,
-            -0.049 + Math.random() * 0.002,
-            (Math.random() - 0.5) * 0.04
-          );
-          baseDecoration.add(moss);
-        }
-        
-        treeGroup.add(baseDecoration);
-        
-        // スケールを大きくする
-        treeGroup.scale.set(1.1, 1.2, 1.1);
-        
-        return treeGroup;
+        decorationGroup.add(obj);
+      });
+      
+      boardGroup.add(decorationGroup);
+      
+      return boardGroup;
+    }
+
+    // -------------------------------
+    // 洗練された盤面カーソル
+    // -------------------------------
+    function createBoardCursor() {
+      const cursorGroup = new THREE.Group();
+      
+      // 半透明の平面（セル全体）
+      const planeGeometry = new THREE.PlaneGeometry(0.0625, 0.0625);
+      const planeMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffaa,
+        transparent: true,
+        opacity: 0.4,
+        side: THREE.DoubleSide
+      });
+      const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+      plane.rotation.x = -Math.PI / 2; // 盤面に合わせて水平に
+      cursorGroup.add(plane);
+      
+      // 枠線（エッジをハイライト）
+      const edgeGeometry = new THREE.EdgesGeometry(planeGeometry);
+      const edgeMaterial = new THREE.LineBasicMaterial({
+        color: 0xffff00,
+        transparent: true,
+        opacity: 0.8,
+        linewidth: 2
+      });
+      const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+      edges.rotation.x = -Math.PI / 2;
+      cursorGroup.add(edges);
+      
+      // 角の装飾（小さな球体）
+      const sphereGeometry = new THREE.SphereGeometry(0.003, 8, 8);
+      const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      
+      // 四隅に小さな球体を配置
+      const cornerPositions = [
+        [-0.03125, 0, -0.03125],
+        [ 0.03125, 0, -0.03125],
+        [-0.03125, 0,  0.03125],
+        [ 0.03125, 0,  0.03125]
+      ];
+      
+      cornerPositions.forEach(pos => {
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        sphere.position.set(pos[0], 0.001, pos[2]);
+        cursorGroup.add(sphere);
+      });
+      
+      cursorGroup.visible = false;
+      return cursorGroup;
+    }
+
+    // -------------------------------
+    // 高級感のある駒の作成
+    // -------------------------------
+    function createPiece(x, z, player) {
+      const radius = 0.028; // 半径を0.03から0.028に縮小
+      const height = 0.004; // 高さも0.005から0.004に調整
+      const segments = 32;
+      const radiusSegments = 32; // 円周の分割数
+      const edgeRadius = 0.0025; // エッジの丸み
+      
+      // 高級感のある駒のジオメトリ（エッジを丸くする）
+      const geometry = new THREE.CylinderGeometry(radius, radius, height, segments, 1, false, 0, Math.PI * 2);
+      
+      // エッジを滑らかにする
+      geometry.vertices = bevelCylinderEdges(geometry.vertices, radius, height, edgeRadius);
+      
+      let material;
+      if (player === 1) {
+        // 黒駒（艶のある黒檀風）
+        material = new THREE.MeshPhysicalMaterial({
+          color: 0x111111,
+          metalness: 0.15,  // 0.1から0.15に変更
+          roughness: 0.15,  // 0.2から0.15に変更でより艶やかに
+          reflectivity: 0.6, // 0.5から0.6に変更
+          clearcoat: 0.4,    // 0.3から0.4に変更
+          clearcoatRoughness: 0.15 // 0.2から0.15に変更
+        });
+      } else {
+        // 白駒（大理石風）
+        material = new THREE.MeshPhysicalMaterial({
+          color: 0xf5f5f5,  // より純白に
+          metalness: 0.12,  // 0.1から0.12に変更
+          roughness: 0.25,  // 0.3から0.25に変更
+          reflectivity: 0.8, // 0.7から0.8に変更
+          clearcoat: 0.6,    // 0.5から0.6に変更
+          clearcoatRoughness: 0.08 // 0.1から0.08に変更
+        });
       }
       
-      // 細かい枝と葉を生成する関数
-      function createDetailedBranchesAndLeaves(parentGroup) {
-        // メイン枝のパラメータ
-        const mainBranches = [
-          { angle: 0.2, height: 0.03, length: 0.05, size: 0.008 },
-          { angle: 1.2, height: 0.05, length: 0.045, size: 0.007 },
-          { angle: 2.3, height: 0.04, length: 0.048, size: 0.0075 },
-          { angle: 3.5, height: 0.06, length: 0.052, size: 0.008 },
-          { angle: 4.7, height: 0.035, length: 0.044, size: 0.007 }
-        ];
-        
-        // メイン枝を生成
-        mainBranches.forEach(branch => {
-          const branchGroup = new THREE.Group();
-          
-          // 枝の作成
-          const branchGeom = new THREE.CylinderGeometry(branch.size * 0.6, branch.size, branch.length, 6);
-          const branchMat = new THREE.MeshStandardMaterial({
-            color: 0x5a4030,
-            roughness: 0.7,
-            metalness: 0.1
-          });
-          
-          const branchMesh = new THREE.Mesh(branchGeom, branchMat);
-          // 枝を水平方向に傾ける
-          branchMesh.rotation.z = Math.PI / 2;
-          // 枝の位置を設定
-          branchMesh.position.x = branch.length / 2;
-          
-          branchGroup.add(branchMesh);
-          
-          // 各メイン枝に葉のクラスターを追加
-          const leafClusterCount = 3 + Math.floor(Math.random() * 3);
-          for (let i = 0; i < leafClusterCount; i++) {
-            const leafCluster = createLeafCluster();
-            const pos = i / leafClusterCount;
-            leafCluster.position.x = branch.length * (0.3 + pos * 0.7); // 枝の中間から先端に向けて配置
-            leafCluster.position.y = (Math.random() - 0.5) * 0.01;
-            leafCluster.position.z = (Math.random() - 0.5) * 0.01;
-            leafCluster.rotation.set(
-              Math.random() * Math.PI,
-              Math.random() * Math.PI,
-              Math.random() * Math.PI
-            );
-            leafCluster.scale.set(0.8, 0.8, 0.8);
-            branchGroup.add(leafCluster);
+      const piece = new THREE.Mesh(geometry, material);
+      
+      // セル中央に配置：左下(-0.25,-0.25)から各セル0.0625、中央は+0.03125
+      const boardX = -0.25 + 0.03125 + (x * 0.0625);
+      const boardZ = -0.25 + 0.03125 + (z * 0.0625);
+      
+      // 水平に配置（回転を修正）- 注意: これが駒の向きの修正
+      // 回転をリセット
+      piece.rotation.x = 0;
+      piece.position.set(boardX, 0.035, boardZ); // Y位置を0.035に設定
+      
+      // 影を落とす・受ける設定を追加
+      piece.castShadow = true;
+      piece.receiveShadow = true;
+      
+      board.add(piece);
+      pieces.push({ mesh: piece, x: x, z: z, player: player });
+      
+      return piece;
+    }
+    
+    // 円柱のエッジを滑らかにする関数
+    function bevelCylinderEdges(vertices, radius, height, edgeRadius) {
+      // このバージョンのThree.jsでは直接ジオメトリの頂点をいじる代わりに
+      // BufferGeometryを使って新しく作り直す方が良いですが、
+      // 簡易的な実装として空関数を返しておきます
+      return vertices;
+    }
+    
+    function updatePieces() {
+      // 既存の駒を削除
+      for (const piece of pieces) {
+        board.remove(piece.mesh);
+      }
+      pieces = [];
+      
+      // 盤面状態に基づいて駒を再作成
+      for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+          if (boardState[i][j] !== 0) {
+            createPiece(j, i, boardState[i][j]);
           }
-          
-          // サブ枝を追加（メイン枝から派生する小枝）
-          const subBranchCount = 1 + Math.floor(Math.random() * 2);
-          for (let i = 0; i < subBranchCount; i++) {
-            const subBranchGroup = new THREE.Group();
-            const subBranchLength = branch.length * 0.4;
-            const subBranchSize = branch.size * 0.6;
-            
-            const subBranchGeom = new THREE.CylinderGeometry(subBranchSize * 0.6, subBranchSize, subBranchLength, 5);
-            const subBranchMesh = new THREE.Mesh(subBranchGeom, branchMat);
-            
-            subBranchMesh.rotation.z = Math.PI / 2;
-            subBranchMesh.position.x = subBranchLength / 2;
-            subBranchGroup.add(subBranchMesh);
-            
-            // サブ枝に葉を追加
-            const subLeafCluster = createLeafCluster();
-            subLeafCluster.position.x = subBranchLength * 0.8;
-            subLeafCluster.scale.set(0.7, 0.7, 0.7);
-            subBranchGroup.add(subLeafCluster);
-            
-            // サブ枝をメイン枝に取り付ける
-            subBranchGroup.position.x = branch.length * (0.3 + Math.random() * 0.5);
-            subBranchGroup.rotation.y = Math.PI * (Math.random() - 0.5) * 0.8;
-            subBranchGroup.rotation.z = Math.random() * Math.PI * 0.4 - Math.PI * 0.2;
-            branchGroup.add(subBranchGroup);
-          }
-          
-          // 枝グループを親に取り付ける
-          branchGroup.position.y = branch.height;
-          branchGroup.rotation.y = Math.PI * 2 * branch.angle;
-          parentGroup.add(branchGroup);
-        });
-        
-        // 木の上部に葉のクラスターを追加
-        const topLeafClusters = new THREE.Group();
-        for (let i = 0; i < 10; i++) {
-          const leafCluster = createLeafCluster();
-          leafCluster.position.set(
-            (Math.random() - 0.5) * 0.04,
-            0.07 + Math.random() * 0.03,
-            (Math.random() - 0.5) * 0.04
-          );
-          leafCluster.rotation.set(
-            Math.random() * Math.PI,
-            Math.random() * Math.PI,
-            Math.random() * Math.PI
-          );
-          
-          // ランダムなスケール
-          const scale = 0.7 + Math.random() * 0.4;
-          leafCluster.scale.set(scale, scale, scale);
-          
-          topLeafClusters.add(leafCluster);
         }
-        parentGroup.add(topLeafClusters);
+      }
+    }
+
+    // -------------------------------
+    // 有効手判定
+    // -------------------------------
+    function isValidMove(row, col, player) {
+      if (boardState[row][col] !== 0) return false;
+      
+      const directions = [
+        [-1, -1], [-1, 0], [-1, 1],
+        [ 0, -1],          [ 0, 1],
+        [ 1, -1], [ 1, 0], [ 1, 1]
+      ];
+      
+      for (const [dx, dy] of directions) {
+        let x = row + dx, y = col + dy;
+        let foundOpponent = false;
+        
+        while (x >= 0 && x < 8 && y >= 0 && y < 8 && boardState[x][y] === -player) {
+          x += dx;
+          y += dy;
+          foundOpponent = true;
+        }
+        
+        if (foundOpponent && x >= 0 && x < 8 && y >= 0 && y < 8 && boardState[x][y] === player) {
+          return true;
+        }
       }
       
-      // 葉のクラスターを作成する関数
-      function createLeafCluster() {
-        const leafGroup = new THREE.Group();
-        
-        // 葉の枚数
-        const leafCount = 5 + Math.floor(Math.random() * 4);
-        
-        // 葉の色（少しばらつきをもたせる）
-        const baseColor = new THREE.Color(0x2d5e29);
-        
-        for (let i = 0; i < leafCount; i++) {
-          // 個々の葉の形状（細長い楕円形）
-          const leafShape = new THREE.Shape();
-          const leafLength = 0.015 + Math.random() * 0.01;
-          const leafWidth = 0.005 + Math.random() * 0.003;
+      return false;
+    }
+
+    // -------------------------------
+    // 駒配置と挟んだ駒反転（パーティクル効果付き）
+    // -------------------------------
+    function placePiece(row, col, player, startPosition) {
+      boardState[row][col] = player;
           
-          // 葉の形状を定義（先端が尖った楕円）
-          leafShape.moveTo(0, -leafWidth / 2);
-          leafShape.quadraticCurveTo(
-            leafLength * 0.7, -leafWidth / 2,
-            leafLength, 0
-          );
-          leafShape.quadraticCurveTo(
-            leafLength * 0.7, leafWidth / 2,
-            0, leafWidth / 2
-          );
-          leafShape.lineTo(0, -leafWidth / 2);
+      const directions = [
+        [-1, -1], [-1, 0], [-1, 1],
+        [ 0, -1],          [ 0, 1],
+        [ 1, -1], [ 1, 0], [ 1, 1]
+      ];
           
-          // 葉の厚み
-          const extrudeSettings = {
-            steps: 1,
-            depth: 0.001,
-            bevelEnabled: false
-          };
+      let flippedPieces = [];
           
-          const leafGeom = new THREE.ExtrudeGeometry(leafShape, extrudeSettings);
-          
-          // 葉の色をわずかにランダム化
-          const leafColor = baseColor.clone();
-          leafColor.r += (Math.random() - 0.5) * 0.1;
-          leafColor.g += (Math.random() - 0.5) * 0.1;
-          leafColor.b += (Math.random() - 0.5) * 0.05;
-          
-          const leafMat = new THREE.MeshStandardMaterial({
-            color: leafColor,
-            roughness: 0.8,
-            metalness: 0.1,
-            side: THREE.DoubleSide
-          });
-          
-          const leaf = new THREE.Mesh(leafGeom, leafMat);
-          
-          // 葉をランダムな向きに配置
-          leaf.position.set(
-            (Math.random() - 0.5) * 0.01,
-            (Math.random() - 0.5) * 0.01,
-            (Math.random() - 0.5) * 0.01
-          );
-          
-          leaf.rotation.set(
-            Math.random() * Math.PI,
-            Math.random() * Math.PI,
-            Math.random() * Math.PI
-          );
-          
-          leafGroup.add(leaf);
+      for (const [dx, dy] of directions) {
+        let flips = [];
+        let x = row + dx, y = col + dy;
+            
+        while (x >= 0 && x < 8 && y >= 0 && y < 8 && boardState[x][y] === -player) {
+          flips.push([x, y]);
+          x += dx;
+          y += dy;
         }
-        
-        return leafGroup;
+            
+        if (flips.length > 0 && x >= 0 && x < 8 && y >= 0 && y < 8 && boardState[x][y] === player) {
+          for (const [fx, fy] of flips) {
+            boardState[fx][fy] = player;
+            flippedPieces.push([fx, fy]);
+          }
+        }
       }
+          
+      moveCount++;
+      updateStatus();
+      
+      // 新しい駒のアニメーションを開始（ひっくり返す駒の情報も渡す）
+      startPieceDropAnimation(row, col, player, startPosition, flippedPieces);
+          
+      // 相手のターンになったら有効手マーカーをクリア
+      clearValidMoveMarkers();
+
+      // ターンを相手に交代
+      currentPlayer = -player;
+
+      // ひっくり返すアニメーションは駒が置かれた後に実行されるため、ここでは設定だけ
+      // 実際のアニメーション開始はupdateDroppingPieces内で駒の設置完了後に行われる
+    }
+
+    // 駒をひっくり返すアニメーションを開始する関数
+    function startFlipAnimation(row, col, player) {
+      // 既存の駒があれば探す
+      let existingPiece = null;
+      for (let i = 0; i < pieces.length; i++) {
+        if (pieces[i].x === col && pieces[i].z === row) {
+          existingPiece = pieces[i].mesh;
+          break;
+        }
+      }
+
+      // 既存の駒がなければ新しく作る
+      if (!existingPiece) {
+        return;
+      }
+
+      // 影の設定を確認
+      if (!existingPiece.castShadow) {
+        existingPiece.castShadow = true;
+        existingPiece.receiveShadow = true;
+      }
+
+      // アニメーション情報を設定
+      flippingPieces.push({
+        mesh: existingPiece,
+        player: player,
+        originalY: 0.035, // 元のY位置を0.035に設定
+        targetY: 0.032,   // 目標のY位置を0.032に設定
+        frame: 0, // アニメーションフレーム
+        row: row,
+        col: col,
+        completed: false, // アニメーション完了フラグ
+        soundPlayed: false // 効果音フラグ（1回だけ再生するため）
+      });
+    }
+
+    // 駒のフリップアニメーションを更新する関数
+    function updateFlippingPieces(deltaTime) {
+      if (flippingPieces.length === 0) return;
+
+      // デルタタイムに乗数を適用してアニメーション速度を調整
+      const adjustedDelta = deltaTime * DELTA_MULTIPLIER;
+
+      for (let i = flippingPieces.length - 1; i >= 0; i--) {
+        const piece = flippingPieces[i];
+        
+        // フレームを進める
+        piece.frame += adjustedDelta;
+        
+        if (piece.frame <= FLIP_RISE_TIME) {
+          // 上昇フェーズ
+          const progress = piece.frame / FLIP_RISE_TIME;
+          const easeProgress = easeOutQuint(progress); // より自然な上昇カーブ
+          piece.mesh.position.y = piece.originalY + (FLIP_RISE_HEIGHT * easeProgress);
+          
+          // 上昇中に少し回転を始める（より自然な動き）
+          if (progress > 0.3) {
+            const preRotationProgress = (progress - 0.3) / 0.7;
+            piece.mesh.rotation.x = Math.PI * 0.2 * preRotationProgress;
+          }
+        } 
+        else if (piece.frame <= FLIP_RISE_TIME + FLIP_ROTATE_TIME) {
+          // 回転フェーズ
+          const progress = (piece.frame - FLIP_RISE_TIME) / FLIP_ROTATE_TIME;
+          const easeProgress = easeInOutSine(progress); // よりスムーズな回転カーブ
+          
+          // X軸回転（180度）- よりスムーズに
+          piece.mesh.rotation.x = Math.PI * (0.2 + easeProgress * 0.8);
+          
+          // 回転中は高さを維持し、回転の進行に合わせて徐々に下がる
+          const heightFactor = 1.0 - Math.pow(progress, 2) * 0.3;
+          piece.mesh.position.y = piece.originalY + FLIP_RISE_HEIGHT * heightFactor;
+          
+          // 回転の途中で材質を変更
+          if (progress >= 0.4 && progress <= 0.6 && !piece.materialChanging) {
+            piece.materialChanging = true;
+            
+            // 材質変更を滑らかにするため、一時的に透明度を下げる
+            piece.mesh.material.transparent = true;
+            piece.mesh.material.opacity = 0.6;
+            
+            // 少し遅れて色を変更
+            setTimeout(() => {
+              if (!piece.mesh) return; // 既に削除されている場合は何もしない
+              
+              // 材質を反対の色に変更
+              piece.mesh.material = piece.player === 1 ?
+                new THREE.MeshPhysicalMaterial({
+                  color: 0x111111,
+                  metalness: 0.15,  // 0.1から0.15に変更
+                  roughness: 0.15,  // 0.2から0.15に変更でより艶やかに
+                  reflectivity: 0.6, // 0.5から0.6に変更
+                  clearcoat: 0.4,    // 0.3から0.4に変更
+                  clearcoatRoughness: 0.15 // 0.2から0.15に変更
+                }) :
+                new THREE.MeshPhysicalMaterial({
+                  color: 0xf5f5f5,  // より純白に
+                  metalness: 0.12,  // 0.1から0.12に変更
+                  roughness: 0.25,  // 0.3から0.25に変更
+                  reflectivity: 0.8, // 0.7から0.8に変更
+                  clearcoat: 0.6,    // 0.5から0.6に変更
+                  clearcoatRoughness: 0.08 // 0.1から0.08に変更
+                });
+              
+              // 影の設定を維持
+              piece.mesh.castShadow = true;
+              piece.mesh.receiveShadow = true;
+              
+              // 透明度を徐々に戻す
+              setTimeout(() => {
+                if (!piece.mesh || !piece.mesh.material) return;
+                piece.mesh.material.opacity = 0.8;
+                
+                setTimeout(() => {
+                  if (!piece.mesh || !piece.mesh.material) return;
+                  piece.mesh.material.opacity = 1.0;
+                  piece.mesh.material.transparent = false;
+                  piece.materialChanged = true;
+                }, 50);
+              }, 50);
+            }, 50);
+          }
+        } 
+        else if (piece.frame <= FLIP_DURATION) {
+          // 下降フェーズ
+          const progress = (piece.frame - FLIP_RISE_TIME - FLIP_ROTATE_TIME) / FLIP_FALL_TIME;
+          const easeProgress = easeInQuint(progress); // より自然な下降カーブ
+          const targetY = piece.targetY; // 目標の高さ（0.032）
+          
+          // 現在の高さから目標の高さへ
+          const currentHeight = piece.mesh.position.y;
+          piece.mesh.position.y = currentHeight - (currentHeight - targetY) * easeProgress;
+          
+          // 回転が完了していることを確認
+          piece.mesh.rotation.x = Math.PI;
+          
+          // 下降フェーズの終わり頃（90%以上）で効果音を再生
+          if (progress > 0.9 && !piece.soundPlayed) {
+            playSound('flip');
+            piece.soundPlayed = true;
+          }
+        } 
+        else {
+          // アニメーション完了
+          piece.mesh.position.y = piece.originalY;
+          piece.mesh.rotation.x = 0; // 回転をリセット (0度または180度)
+          piece.completed = true;
+          
+          // アニメーション完了した駒をリストから削除
+          flippingPieces.splice(i, 1);
+          
+          // 全ての駒のアニメーション完了を確認
+          if (flippingPieces.length === 0) {
+            // 全てのアニメーションが完了したら次のターンへ
+            checkGameStateAndProceed();
+          }
+        }
+      }
+    }
+    
+    // 追加のイージング関数（より洗練された動きのため）
+    function easeOutQuint(t) {
+      return 1 - Math.pow(1 - t, 5);
+    }
+    
+    function easeInQuint(t) {
+      return t * t * t * t * t;
+    }
+    
+    function easeInOutSine(t) {
+      return -(Math.cos(Math.PI * t) - 1) / 2;
+    }
+    
+    // 元のイージング関数も保持（他の箇所で使用されている可能性あり）
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+    
+    function easeInCubic(t) {
+      return t * t * t;
+    }
+    
+    function easeInOutQuad(t) {
+      return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    }
 
     // アニメーションが終わった後、ゲーム状態をチェックして次に進む
     function checkGameStateAndProceed() {
@@ -4184,6 +4225,300 @@
           setTimeout(makeCPUMove, 100);
         }
       }
+    }
+    
+    // -------------------------------
+    // 有効手の有無とゲーム状態チェック
+    // -------------------------------
+    function hasValidMoves(player) {
+      for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+          if (isValidMove(i, j, player)) return true;
+        }
+      }
+      
+      return false;
+    }
+    
+    // ゲーム結果メニュー表示
+    function showGameResultMenu(isWin) {
+      gameResultMenu = createGameResultMenu(isWin);
+      // 盤面の右側に表示する（ステータスボードと被らない位置）
+      gameResultMenu.position.set(0.7, 1.0, -0.9); // Z座標を-1.1から-0.9に変更（より手前に）
+      gameResultMenu.rotation.y = -Math.PI / 6; // 少し内側に向ける
+      scene.add(gameResultMenu);
+      
+      // ゲーム状態を変更せず、盤面を維持したまま再プレイのオプションを表示
+      gameStarted = false;
+    }
+
+    // -------------------------------
+    // CPUの手（難易度別AI）
+    // -------------------------------
+    function makeCPUMove() {
+      if (!isPlayerTurn && !isProcessingMove) {
+        // 処理中フラグをオン
+        isProcessingMove = true;
+        
+        const validMoves = [];
+        
+        // 全有効手をリストアップ
+        for (let i = 0; i < 8; i++) {
+          for (let j =0; j < 8; j++) {
+            if (isValidMove(i, j, -1)) {
+              // 難易度に応じたスコアリング
+              let score = 0;
+              
+              if (difficultyLevel === 'easy') {
+                // 初級：ランダムに近い動き
+                score = Math.random() * 10;
+              } else if (difficultyLevel === 'medium' || difficultyLevel === 'hard') {
+                // 中級以上：位置評価を含む
+                
+                // 角は非常に価値が高い
+                if ((i === 0 || i === 7) && (j === 0 || j === 7)) {
+                  score += 100;
+                }
+                
+                // 角の隣は危険なので避ける（上級のみ）
+                if (difficultyLevel === 'hard') {
+                  if ((i === 0 || i === 1 || i === 6 || i === 7) && 
+                      (j === 0 || j === 1 || j === 6 || j === 7) &&
+                      !((i === 0 || i === 7) && (j === 0 || j === 7))) {
+                    score -= 50;
+                  }
+                }
+                
+                // 端は比較的安定
+                if (i === 0 || i === 7 || j === 0 || j === 7) {
+                  score += 20;
+                }
+                
+                // ひっくり返せる駒の数も考慮（上級はより重視）
+                const flipCount = countFlips(i, j, -1);
+                score += difficultyLevel === 'hard' ? flipCount * 2 : flipCount;
+                
+                // 上級は少しランダム性を減らす
+                if (difficultyLevel === 'hard') {
+                  score += Math.random() * 5;
+                } else {
+                  score += Math.random() * 15;
+                }
+              }
+              
+              validMoves.push({ row: i, col: j, score: score });
+            }
+          }
+        }
+        
+        if (validMoves.length > 0) {
+          // CPUの思考エフェクト
+          updateGameMessage('CPUが考え中...');
+          
+          // スコアでソート（高い順）
+          validMoves.sort((a, b) => b.score - a.score);
+          
+          // 難易度に応じた手の選択
+          let selectedMove;
+          
+          if (difficultyLevel === 'easy') {
+            const randomIndex = Math.floor(Math.random() * validMoves.length);
+            selectedMove = validMoves[randomIndex];
+          } else if (difficultyLevel === 'medium') {
+            const topMoves = validMoves.slice(0, Math.min(3, validMoves.length));
+            const randomIndex = Math.floor(Math.random() * topMoves.length);
+            selectedMove = topMoves[randomIndex];
+          } else {
+            selectedMove = validMoves[0];
+          }
+          
+          const { row, col } = selectedMove;
+          
+          // 思考エフェクト後に駒を置く（難易度に応じて時間差）
+          const thinkTime = difficultyLevel === 'easy' ? 
+                          100 + Math.random() * 100 :
+                          difficultyLevel === 'medium' ? 
+                          200 + Math.random() * 100 :
+                          300 + Math.random() * 200;
+          
+          setTimeout(() => {
+            // 駒を置く（アニメーション付き）
+            placePiece(row, col, -1, null);
+            updateGameMessage(`CPUが (${col+1}, ${row+1}) に置きました。`);
+          }, thinkTime);
+        } else {
+          // 有効な手がない場合はパス処理
+          updateGameMessage('CPUはパスです。プレイヤーの番です。');
+          currentPlayer = 1;
+          isPlayerTurn = true;
+          isProcessingMove = false; // 処理完了
+          setTimeout(() => {
+            showValidMoves(1);
+          }, 300);
+        }
+      }
+    }
+    
+    // ひっくり返せる駒の数を数える（AIの評価用）
+    function countFlips(row, col, player) {
+      let count = 0;
+      
+      const directions = [
+        [-1, -1], [-1, 0], [-1, 1],
+        [ 0, -1],          [ 0, 1],
+        [ 1, -1], [ 1, 0], [ 1, 1]
+      ];
+      
+      for (const [dx, dy] of directions) {
+        let flips = 0;
+        let x = row + dx, y = col + dy;
+        
+        while (x >= 0 && x < 8 && y >= 0 && y < 8 && boardState[x][y] === -player) {
+          flips++;
+          x += dx;
+          y += dy;
+        }
+        
+        if (flips > 0 && x >= 0 && x < 8 && y >= 0 && y < 8 && boardState[x][y] === player) {
+          count += flips;
+        }
+      }
+      
+      return count;
+    }
+
+    // -------------------------------
+    // コントローラー select イベント
+    // -------------------------------
+    function onSelect(event) {
+      if (isGripping[0] || isGripping[1]) return;
+      
+      // 連続した素早いトリガー操作を防止する（デバウンス処理）
+      const currentTime = Date.now();
+      const cooldownTime = 500; // 500ミリ秒のクールダウン期間
+      
+      if (currentTime - lastSelectTime < cooldownTime || isProcessingMove) {
+        console.log('操作が早すぎます。少し待ってください。');
+        return; // クールダウン中は処理をスキップ
+      }
+      
+      lastSelectTime = currentTime;
+      
+      const controllerIndex = controllers.indexOf(event.target);
+      const controller = controllers[controllerIndex];
+      const raycaster = new THREE.Raycaster();
+      const tempMatrix = new THREE.Matrix4();
+      tempMatrix.extractRotation(controller.matrixWorld);
+      raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+      raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+      
+      // 難易度選択メニューの処理
+      if (difficultyMenu) {
+        const menuIntersects = raycaster.intersectObject(difficultyMenu, true);
+        
+        if (menuIntersects.length > 0) {
+          const intersectedObject = getParentWithUserData(menuIntersects[0].object);
+          
+          if (intersectedObject && intersectedObject.userData) {
+            if (intersectedObject.userData.type === 'difficultyButton') {
+              // 難易度ボタン選択
+              highlightButton(intersectedObject);
+            } else if (intersectedObject.userData.type === 'startButton') {
+              // スタートボタン押下
+              playSound('select');
+              initBoard();
+              initializeGame();
+            }
+          }
+          return;
+        }
+      }
+      
+      // ゲーム結果メニューの処理
+      if (gameResultMenu) {
+        const resultIntersects = raycaster.intersectObject(gameResultMenu, true);
+        
+        if (resultIntersects.length > 0) {
+          const intersectedObject = getParentWithUserData(resultIntersects[0].object);
+          
+          if (intersectedObject && intersectedObject.userData) {
+            if (intersectedObject.userData.type === 'difficultyMenuButton') {
+              // 難易度選択に戻る
+              playSound('select');
+              scene.remove(gameResultMenu);
+              gameResultMenu = null;
+              
+              // 難易度選択メニューを表示
+              difficultyMenu = createDifficultyMenu();
+              difficultyMenu.position.set(0, 1.3, -1.1); // -1.3から-1.1に変更（より手前に）
+              difficultyMenu.userData.faceCamera = true; // カメラの方向を常に向くように
+              scene.add(difficultyMenu);
+            } else if (intersectedObject.userData.type === 'rematchButton') {
+              // 同じ難易度で再戦
+              playSound('select');
+              scene.remove(gameResultMenu);
+              gameResultMenu = null;
+              
+              // 新しいゲーム開始（盤面はリセットする）
+              initBoard();
+              initializeGame();
+            }
+          }
+          return;
+        }
+      }
+      
+      // ゲームプレイの処理（ボード上での選択）
+      if (board && boardBase && gameStarted && isPlayerTurn && !isProcessingMove) {
+        const intersects = raycaster.intersectObject(boardBase);
+        
+        if (intersects.length > 0) {
+          const intersect = intersects[0];
+          const localPoint = board.worldToLocal(intersect.point.clone());
+          
+          let col = Math.floor((localPoint.x + 0.25) / 0.0625);
+          let row = Math.floor((localPoint.z + 0.25) / 0.0625);
+          
+          if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+            if (isValidMove(row, col, 1)) {
+              console.log('==== 駒を置く処理開始 ====');
+              
+              // 処理中フラグをオン
+              isProcessingMove = true;
+              
+              // プレイヤーターンを一時的に無効化（駒のアニメーション中に再度置けないようにする）
+              isPlayerTurn = false;
+              
+              // 駒を置く
+              placePiece(row, col, 1, controller); // コントローラーオブジェクト自体を渡す
+              updateGameMessage(`プレイヤーが (${col+1}, ${row+1}) に置きました。\nCPUの番です。`);
+              
+              // すべてのアニメーションが完了したらisProcessingMoveフラグは
+              // checkGameStateAndProceed関数内でリセットされる
+            } else {
+              updateGameMessage('そこには置けません。別の場所を選んでください。');
+            }
+          }
+        }
+      }
+    }
+    
+    // ユーザーデータを持つ親オブジェクトを取得
+    function getParentWithUserData(object) {
+      let current = object;
+      
+      while (current) {
+        if (current.userData && 
+            (current.userData.type === 'difficultyButton' || 
+             current.userData.type === 'startButton' ||
+             current.userData.type === 'difficultyMenuButton' ||
+             current.userData.type === 'rematchButton')) {
+          return current;
+        }
+        current = current.parent;
+      }
+      
+      return null;
     }
 
     // -------------------------------
