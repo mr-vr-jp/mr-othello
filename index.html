@@ -170,63 +170,6 @@
       width: 100%;
       height: 100%;
     }
-    
-    /* ブラウザゲーム用のスタイル */
-    #gameContainer {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #1a1a2e;
-    }
-
-    .game-board {
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
-      gap: 2px;
-      background: #2a2a4a;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-    }
-
-    .cell {
-      width: 60px;
-      height: 60px;
-      background: #3a3a5a;
-      border-radius: 5px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-
-    .cell:hover {
-      background: #4a4a6a;
-    }
-
-    .cell.black {
-      background: #000;
-    }
-
-    .cell.white {
-      background: #fff;
-    }
-
-    .game-info {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background: rgba(0, 0, 0, 0.7);
-      padding: 15px;
-      border-radius: 10px;
-      color: white;
-    }
   </style>
 </head>
 <body>
@@ -241,6 +184,9 @@
     </div>
     
     <button id="startButton">MRモード開始</button>
+    
+    <!-- デスクトップモード用のボタンを追加 -->
+    <button id="desktopButton" style="background: linear-gradient(135deg, #366873, #183048); margin-bottom: 25px;">ブラウザモード開始</button>
     
     <div class="instructions">
       <h3>操作方法</h3>
@@ -442,788 +388,10 @@
       createSimpleSound('select', 0.4, 'click');         // メニュー選択音
     }
 
-
-
-
-    // 効果音の再生（バリエーション付き）
-    function playSound(name) {
-      if (!soundEnabled || !sounds[name]) return;
-      
-      // 現在再生中なら一度停止
-      if (sounds[name].isPlaying) {
-        sounds[name].stop();
-      }
-      
-      // すべての効果音は固定ピッチで再生
-      sounds[name].setPlaybackRate(1.0);
-      
-      // 再生
-      sounds[name].play();
-    }
-
-    // WebAudio APIで効果音を生成する関数（バリエーション追加版）
-    function createSimpleSound(name, volume = 0.5, type = 'default', loop = false) {
-      const sound = new THREE.Audio(listener);
-      sounds[name] = sound;
-      sound.setVolume(volume);
-      sound.setLoop(loop);
-      
-      // オーディオコンテキスト
-      const context = listener.context;
-      const sampleRate = context.sampleRate;
-      
-      // 音の長さ（秒）
-      let duration = 0.3;
-      if (type === 'startup') duration = 1.0;
-      if (type === 'fanfare') duration = 2.0;
-      if (type === 'ambient') duration = 4.0;
-      
-      // バッファを作成
-      const bufferSize = sampleRate * duration;
-      const buffer = context.createBuffer(1, bufferSize, sampleRate);
-      const data = buffer.getChannelData(0);
-      
-      // 波形生成
-      for (let i = 0; i < bufferSize; i++) {
-        const t = i / sampleRate; // 時間（秒）
-        let val = 0;
-        
-        if (type === 'playerPlace') {
-          // プレイヤーの駒を置く音（明るめの音）
-          const freq = 600;
-          const decay = 15;
-          val = Math.sin(2 * Math.PI * freq * t);
-          val += 0.3 * Math.sin(2 * Math.PI * freq * 1.5 * t); // 明るい倍音
-          val *= Math.exp(-decay * t);
-        } else if (type === 'cpuPlace') {
-          // CPUの駒を置く音（低めの音）
-          const freq = 400;
-          const decay = 15;
-          val = Math.sin(2 * Math.PI * freq * t);
-          val += 0.2 * Math.sin(2 * Math.PI * freq * 2 * t); // 倍音
-          val *= Math.exp(-decay * t);
-        } else if (type === 'click') {
-          // 使い分け：flip用とselect用で異なる音を生成
-          if (name === 'flip') {
-            // 駒をひっくり返す音（木製の質感）
-            const woodFreq = 800;
-            
-            // 木製の音
-            val = Math.sin(2 * Math.PI * woodFreq * t);
-            val += 0.4 * Math.sin(2 * Math.PI * woodFreq * 1.5 * t);
-            
-            // カチッという音
-            if (t > 0.05 && t < 0.15) {
-              const tapSound = Math.sin(2 * Math.PI * 1200 * (t - 0.05));
-              val += 0.35 * tapSound * Math.exp(-30 * (t - 0.05));
-            }
-            
-            val *= Math.exp(-20 * t);
-          } else if (name === 'select') {
-            // メニュー選択音（短くて明るい音）
-            const freq = 880; // 高い音に変更（660から880へ）
-            val = Math.sin(2 * Math.PI * freq * t);
-            val += 0.3 * Math.sin(2 * Math.PI * freq * 2 * t); // より明るい倍音を追加
-            val *= Math.exp(-40 * t); // より短い減衰
-          }
-        } else if (type === 'startup') {
-          // 起動音（上昇する音）
-          const freq1 = 300 + 700 * t;
-          const freq2 = 600;
-          val = 0.5 * Math.sin(2 * Math.PI * freq1 * t) + 0.5 * Math.sin(2 * Math.PI * freq2 * t);
-          val *= Math.pow(t / duration, 0.2) * Math.exp(-4 * t / duration);
-        } else if (type === 'fanfare') {
-          // 勝利音（ファンファーレ）
-          const phase = t / duration;
-          if (phase < 0.2) {
-            // 最初の音
-            val = Math.sin(2 * Math.PI * 440 * t);
-          } else if (phase < 0.4) {
-            // 2つ目の音
-            val = Math.sin(2 * Math.PI * 554 * t);
-          } else if (phase < 0.6) {
-            // 3つ目の音
-            val = Math.sin(2 * Math.PI * 659 * t);
-          } else {
-            // フィナーレ
-            val = 0.4 * Math.sin(2 * Math.PI * 440 * t) + 
-                  0.3 * Math.sin(2 * Math.PI * 554 * t) + 
-                  0.3 * Math.sin(2 * Math.PI * 659 * t);
-          }
-          val *= 0.7;
-          val *= Math.exp(-2 * (t - phase * duration) / (duration * 0.2));
-        } else if (type === 'low') {
-          // 敗北音（低く沈む音）
-          const freqStart = 300;
-          const freqEnd = 100;
-          const freq = freqStart - (freqStart - freqEnd) * (t / duration);
-          val = Math.sin(2 * Math.PI * freq * t);
-          val += 0.2 * Math.sin(2 * Math.PI * freq * 0.5 * t); // サブ低音
-          val *= Math.exp(-3 * t / duration);
-        } else {
-          // デフォルト音
-          const freq = 500;
-          val = Math.sin(2 * Math.PI * freq * t);
-          val *= Math.exp(-10 * t / duration);
-        }
-        
-        data[i] = val;
-      }
-      
-      sound.setBuffer(buffer);
-    }
-
-
-
-
     // -------------------------------
-    // 3Dテキスト生成（高品質・立体的）
+    // デスクトップモードで開始
     // -------------------------------
-    function createTextureText(text, size = 0.1, color = "#ffffff") {
-      // キャンバスサイズを大きく
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 256;
-      const context = canvas.getContext('2d');
-      
-      // 背景を透明に
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // フォント設定
-      const fontSize = 72;
-      context.font = `bold ${fontSize}px sans-serif, "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", Osaka, "メイリオ", Meiryo, "MS Pゴシック", "MS PGothic"`;
-      
-      // テキストの描画位置を計算
-      let textX = canvas.width / 2;
-      let textY = canvas.height / 2;
-      
-      // 改行があるかチェック
-      if (text.includes('\n')) {
-        const lines = text.split('\n');
-        const lineHeight = fontSize * 1.2;
-        const totalHeight = lines.length * lineHeight;
-        textY = (canvas.height - totalHeight) / 2 + fontSize / 2;
-        
-        // 複数行のテキストを描画
-        lines.forEach((line, index) => {
-          const y = textY + index * lineHeight;
-          // 光沢効果のためのグラデーション
-          const gradient = context.createLinearGradient(textX - 100, y - fontSize/2, textX + 100, y + fontSize/2);
-          gradient.addColorStop(0, '#ffffff');
-          gradient.addColorStop(0.5, color);
-          gradient.addColorStop(1, '#ffffff');
-          
-          // テキストの影を描画
-          context.shadowColor = 'rgba(0, 0, 0, 0.5)';
-          context.shadowBlur = 10;
-          context.shadowOffsetX = 2;
-          context.shadowOffsetY = 2;
-          context.fillStyle = gradient;
-          context.textAlign = 'center';
-          context.textBaseline = 'middle';
-          context.fillText(line, textX, y, canvas.width - 20);
-          
-          // 装飾的な枠を描画
-          context.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-          context.lineWidth = 2;
-          context.strokeText(line, textX, y, canvas.width - 20);
-        });
-      } else {
-        // 単一行のテキスト
-        // 光沢効果のためのグラデーション
-        const gradient = context.createLinearGradient(textX - 100, textY - fontSize/2, textX + 100, textY + fontSize/2);
-        gradient.addColorStop(0, '#ffffff');
-        gradient.addColorStop(0.5, color);
-        gradient.addColorStop(1, '#ffffff');
-        
-        // テキストの影を描画
-        context.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        context.shadowBlur = 10;
-        context.shadowOffsetX = 2;
-        context.shadowOffsetY = 2;
-        context.fillStyle = gradient;
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(text, textX, textY, canvas.width - 20);
-        
-        // 装飾的な枠を描画
-        context.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        context.lineWidth = 2;
-        context.strokeText(text, textX, textY, canvas.width - 20);
-      }
-      
-      // テクスチャ作成
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.needsUpdate = true;
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      texture.format = THREE.RGBAFormat;
-      texture.type = THREE.UnsignedByteType;
-      texture.colorSpace = THREE.SRGBColorSpace; // カラースペースをsRGBに設定
-      
-      // 発光効果のあるマテリアル
-      const material = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        depthTest: false,
-        toneMapped: false // トーンマッピングを無効化
-      });
-      
-      // テクスチャを貼り付けた平面
-      const geometry = new THREE.PlaneGeometry(size, size * (canvas.height / canvas.width));
-      const mesh = new THREE.Mesh(geometry, material);
-      
-      return mesh;
-    }
-
-    
-    // -------------------------------
-    // 難易度選択メニューの作成
-    // -------------------------------
-    function createDifficultyMenu() {
-      const menuGroup = new THREE.Group();
-      menuGroup.renderOrder = 100; // 最も前面に表示
-      
-      // メニューパネル背景
-      const panelGeometry = new THREE.BoxGeometry(0.6, 0.5, 0.02);
-      const panelMaterial = new THREE.MeshPhongMaterial({
-        color: 0x1a2a4a,
-        transparent: true,
-        opacity: 0, // 最初は完全に透明
-        shininess: 100,
-        depthWrite: true, // 深度書き込みを有効化
-      });
-      const panel = new THREE.Mesh(panelGeometry, panelMaterial);
-      panel.renderOrder = 100; // 最も前面に表示
-      menuGroup.add(panel);
-      
-      // 光沢のある枠
-      const frameGeometry = new THREE.BoxGeometry(0.62, 0.52, 0.01);
-      const frameMaterial = new THREE.MeshPhongMaterial({
-        color: 0x4b6cb7,
-        transparent: true,
-        opacity: 0, // 最初は完全に透明
-        shininess: 120,
-        depthWrite: true, // 深度書き込みを有効化
-      });
-      const frame = new THREE.Mesh(frameGeometry, frameMaterial);
-      frame.position.z = -0.01;
-      frame.renderOrder = 100; // 最も前面に表示
-      menuGroup.add(frame);
-      
-      // タイトルテキスト
-      const titleGroup = new THREE.Group();
-      titleGroup.position.set(0, 0.18, 0.02);
-      titleGroup.renderOrder = 101; // メニューより前面に表示
-
-      const titleText = createTextureText('難易度選択', 0.25);
-      titleText.renderOrder = 101; // メニューより前面に表示
-      titleText.material.opacity = 0; // 最初は完全に透明
-      titleText.material.transparent = true;
-      titleGroup.add(titleText);
-      menuGroup.add(titleGroup);
-      
-      // 難易度ボタン
-      const buttonY = [0.05, -0.05, -0.15];
-      const buttonLabels = ['初級', '中級', '上級'];
-      const buttonValues = ['easy', 'medium', 'hard'];
-      const buttonColors = [0x4caf50, 0x2196f3, 0xf44336];
-      const buttons = [];
-      
-      for (let i = 0; i < 3; i++) {
-        const buttonGroup = new THREE.Group();
-        buttonGroup.position.set(0, buttonY[i], 0.02);
-        buttonGroup.renderOrder = 101; // メニューより前面に表示
-        
-        // ボタン背景
-        const buttonGeometry = new THREE.BoxGeometry(0.35, 0.08, 0.02);
-        const buttonMaterial = new THREE.MeshPhongMaterial({
-          color: buttonColors[i],
-          transparent: true,
-          opacity: 0, // 最初は完全に透明
-          shininess: 100,
-          depthWrite: true, // 深度書き込みを有効化
-        });
-        const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
-        buttonMesh.renderOrder = 101; // メニューより前面に表示
-        buttonGroup.add(buttonMesh);
-        
-        // ボタンテキスト
-        const textMesh = createTextureText(buttonLabels[i], 0.2);
-        textMesh.position.set(0, 0, 0.02);
-        textMesh.renderOrder = 102; // ボタンより前面に表示
-        textMesh.material.opacity = 0; // 最初は完全に透明
-        textMesh.material.transparent = true;
-        buttonGroup.add(textMesh);
-        
-        // ボタンのユーザーデータを設定
-        buttonGroup.userData = {
-          type: 'difficultyButton',
-          value: buttonValues[i],
-          originalColor: buttonColors[i]
-        };
-        
-        buttons.push(buttonGroup);
-        menuGroup.add(buttonGroup);
-      }
-      
-      // スタートボタン
-      const startButtonGroup = new THREE.Group();
-      startButtonGroup.position.set(0, -0.35, 0.02);
-      startButtonGroup.renderOrder = 101; // メニューより前面に表示
-      
-      const startBtnGeometry = new THREE.BoxGeometry(0.4, 0.08, 0.02);
-      const startBtnMaterial = new THREE.MeshPhongMaterial({
-        color: 0x4b6cb7,
-        transparent: true,
-        opacity: 0, // 最初は完全に透明
-        shininess: 100,
-        depthWrite: true, // 深度書き込みを有効化
-      });
-      const startBtnMesh = new THREE.Mesh(startBtnGeometry, startBtnMaterial);
-      startBtnMesh.renderOrder = 101; // メニューより前面に表示
-      startButtonGroup.add(startBtnMesh);
-      
-      const startTextMesh = createTextureText('ゲーム開始', 0.22);
-      startTextMesh.position.set(0, 0, 0.02);
-      startTextMesh.renderOrder = 102; // ボタンより前面に表示
-      startTextMesh.material.opacity = 0; // 最初は完全に透明
-      startTextMesh.material.transparent = true;
-      startButtonGroup.add(startTextMesh);
-      
-      startButtonGroup.userData = {
-        type: 'startButton',
-        originalColor: 0x4b6cb7
-      };
-      
-      menuGroup.add(startButtonGroup);
-      
-      // フェードイン用のユーザーデータを追加
-      menuGroup.userData = {
-        fadeIn: true,
-        fadeProgress: 0,
-        fadeSpeed: 0.008, // 0.02から0.008に変更してより遅くする
-        faceCamera: true
-      };
-      
-      // 最初は初級が選択されているようにハイライト
-      highlightButton(buttons[0]); // 中級(buttons[1])から初級(buttons[0])に変更
-      
-      return menuGroup;
-    }
-
-    // ボタンのハイライト/選択表示
-    function highlightButton(buttonGroup) {
-      // difficultyMenuが存在する場合のみtraverseを実行
-      if (difficultyMenu) {
-        difficultyMenu.traverse((child) => {
-          if (child.userData && child.userData.type === 'difficultyButton') {
-            if (child.children && child.children.length > 0) {
-              child.children[0].material.color.setHex(child.userData.originalColor);
-              if (child.children[0].material.emissive) {
-                child.children[0].material.emissive.set(0x000000);
-              }
-              
-              // 選択されていないボタンは通常の明るさに
-              if (child.children[0].material) {
-                child.children[0].material.shininess = 100;
-              }
-            }
-          }
-        });
-      }
-          
-      // 選択されたボタンをハイライト
-      if (buttonGroup && buttonGroup.userData && buttonGroup.userData.type === 'difficultyButton') {
-        if (buttonGroup.children && buttonGroup.children.length > 0) {
-          // 発光効果を強化
-          if (buttonGroup.children[0].material.emissive) {
-            buttonGroup.children[0].material.emissive.set(0x555555); // より強い発光に設定（0x333333から0x555555）
-          }
-          
-          // 光沢を増加させてより目立たせる
-          if (buttonGroup.children[0].material) {
-            buttonGroup.children[0].material.shininess = 200; // 光沢を強くする（100から200に）
-            // ボタンをやや明るく
-            buttonGroup.children[0].material.color.multiplyScalar(1.3);
-          }
-          
-          // 難易度を更新
-          difficultyLevel = buttonGroup.userData.value;
-          playSound('select');
-        }
-      }
-    }
-    
-    // -------------------------------
-    // ゲーム結果メニュー
-    // -------------------------------
-    function createGameResultMenu(isWin) {
-      const menuGroup = new THREE.Group();
-      menuGroup.renderOrder = 100; // 最も前面に表示
-      
-      // メニューパネル背景（難易度選択メニューと同じデザイン）- 縦サイズを大きくする
-      const panelGeometry = new THREE.BoxGeometry(0.6, 0.55, 0.02); // 0.5から0.55に高さを拡大
-      const panelMaterial = new THREE.MeshPhongMaterial({
-        color: 0x1a2a4a, // 背景色を統一
-        transparent: true,
-        opacity: 0.9,
-        shininess: 100,
-        depthWrite: true, // 深度書き込みを有効化
-      });
-      const panel = new THREE.Mesh(panelGeometry, panelMaterial);
-      panel.renderOrder = 100; // 最も前面に表示
-      menuGroup.add(panel);
-      
-      // 光沢のある枠（勝敗に応じて色が変わる）- こちらも縦サイズを大きくする
-      const frameGeometry = new THREE.BoxGeometry(0.62, 0.57, 0.01); // 0.52から0.57に高さを拡大
-      const frameMaterial = new THREE.MeshPhongMaterial({
-        color: isWin ? 0x4caf50 : 0xf44336,
-        transparent: true,
-        opacity: 0.8,
-        shininess: 120,
-        depthWrite: true, // 深度書き込みを有効化
-      });
-      const frame = new THREE.Mesh(frameGeometry, frameMaterial);
-      frame.position.z = -0.01;
-      frame.renderOrder = 100; // 最も前面に表示
-      menuGroup.add(frame);
-      
-      // 結果テキスト - 位置を少し上に移動
-      const titleGroup = new THREE.Group();
-      titleGroup.position.set(0, 0.2, 0.02); // 0.18から0.2に上に移動
-      titleGroup.renderOrder = 101; // メニューより前面に表示
-      
-      const titleText = createTextureText(isWin ? 'あなたの勝ち！' : 'あなたの負け', 0.25, "#ffffff");
-      titleText.renderOrder = 101; // メニューより前面に表示
-      titleGroup.add(titleText);
-      menuGroup.add(titleGroup);
-      
-      // スコア表示
-      const scoreGroup = new THREE.Group();
-      scoreGroup.position.set(0, 0.07, 0.02); // 0.05から0.07に上に移動
-      scoreGroup.renderOrder = 101; // メニューより前面に表示
-      
-      const scoreText = createTextureText(`プレイヤー: ${playerWins}勝 CPU: ${cpuWins}勝`, 0.2, "#ffffff");
-      scoreText.renderOrder = 101; // メニューより前面に表示
-      scoreGroup.add(scoreText);
-      menuGroup.add(scoreGroup);
-      
-      // 再戦・難易度選択ボタン - 位置を調整
-      const buttonGroup = new THREE.Group();
-      buttonGroup.position.set(0, -0.08, 0.02); // -0.1から-0.08に少し上に移動
-      buttonGroup.renderOrder = 101; // メニューより前面に表示
-      
-      const buttonGeometry = new THREE.BoxGeometry(0.4, 0.08, 0.02);
-      const buttonMaterial = new THREE.MeshPhongMaterial({
-        color: 0x2196f3,
-        transparent: true,
-        opacity: 0.9,
-        shininess: 100,
-        depthWrite: true, // 深度書き込みを有効化
-      });
-      const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
-      buttonMesh.renderOrder = 101; // メニューより前面に表示
-      buttonGroup.add(buttonMesh);
-      
-      const buttonText = createTextureText('難易度選択に戻る', 0.2, "#ffffff");
-      buttonText.position.set(0, 0, 0.02);
-      buttonText.renderOrder = 102; // ボタンより前面に表示
-      buttonGroup.add(buttonText);
-      
-      buttonGroup.userData = {
-        type: 'difficultyMenuButton',
-        originalColor: 0x2196f3
-      };
-      
-      menuGroup.add(buttonGroup);
-      
-      // 再戦ボタン（同じ難易度で）- 位置を調整
-      const rematchGroup = new THREE.Group();
-      rematchGroup.position.set(0, -0.22, 0.02); // -0.25から-0.22に少し上に移動
-      rematchGroup.renderOrder = 101; // メニューより前面に表示
-      
-      const rematchGeometry = new THREE.BoxGeometry(0.4, 0.08, 0.02);
-      const rematchMaterial = new THREE.MeshPhongMaterial({
-        color: 0x4b6cb7,
-        transparent: true,
-        opacity: 0.9,
-        shininess: 100,
-        depthWrite: true, // 深度書き込みを有効化
-      });
-      const rematchMesh = new THREE.Mesh(rematchGeometry, rematchMaterial);
-      rematchMesh.renderOrder = 101; // メニューより前面に表示
-      rematchGroup.add(rematchMesh);
-      
-      const rematchText = createTextureText('同じ難易度で再戦', 0.2, "#ffffff");
-      rematchText.position.set(0, 0, 0.02);
-      rematchText.renderOrder = 102; // ボタンより前面に表示
-      rematchGroup.add(rematchText);
-      
-      rematchGroup.userData = {
-        type: 'rematchButton',
-        originalColor: 0x4b6cb7,
-        playerWon: isWin
-      };
-      
-      menuGroup.add(rematchGroup);
-      
-      return menuGroup;
-    }
-
-    // -------------------------------
-    // 3Dステータス表示の作成（高級感・視認性向上）
-    // -------------------------------
-    function createStatusDisplay() {
-      const displayGroup = new THREE.Group();
-      displayGroup.renderOrder = 50; // 通常のオブジェクトより前、メニューより後ろ
-      
-      // メインパネル（高級感のあるデザイン）
-      const panelGeometry = new THREE.BoxGeometry(0.6, 0.2, 0.02);
-      const panelMaterial = new THREE.MeshPhongMaterial({
-        color: 0x0a0a1a,
-        transparent: true,
-        opacity: 0.95,
-        shininess: 200,
-        emissive: 0x000000,
-        emissiveIntensity: 0.1,
-        depthWrite: true // 深度書き込みを有効化
-      });
-      const panel = new THREE.Mesh(panelGeometry, panelMaterial);
-      panel.renderOrder = 50;
-      displayGroup.add(panel);
-      
-      // 透明なワッカ（回転アニメーション用）
-      const ringGeometry = new THREE.TorusGeometry(0.35, 0.005, 16, 100);
-      const ringMaterial = new THREE.MeshPhongMaterial({
-        color: 0x4b6cb7,
-        transparent: true,
-        opacity: 0.5,
-        shininess: 100,
-        emissive: 0x4b6cb7,
-        emissiveIntensity: 0.2,
-        map: createRingTexture(),
-        depthWrite: false // 深度書き込みをオフに
-      });
-      const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-      ring.rotation.x = Math.PI / 2;
-      ring.renderOrder = 51;
-      displayGroup.add(ring);
-      
-      // 内側の装飾的な枠（角丸）
-      const innerFrameGeometry = new THREE.BoxGeometry(0.58, 0.18, 0.01);
-      const innerFrameMaterial = new THREE.MeshPhongMaterial({
-        color: 0x1a2a4a,
-        transparent: true,
-        opacity: 0.8,
-        shininess: 150,
-        depthWrite: true // 深度書き込みを有効化
-      });
-      const innerFrame = new THREE.Mesh(innerFrameGeometry, innerFrameMaterial);
-      innerFrame.position.z = 0.01;
-      innerFrame.renderOrder = 52;
-      displayGroup.add(innerFrame);
-      
-      // 情報テキスト表示用のグループ
-      const textGroups = [];
-      const textLabels = ['ターン: 0', 'プレイヤー: 0勝', 'CPU: 0勝', ' '];
-      const textPositions = [
-        new THREE.Vector3(0, 0.05, 0.02),  // ターン表示
-        new THREE.Vector3(-0.2, 0, 0.02), // プレイヤー勝利数
-        new THREE.Vector3(0.2, 0, 0.02),  // CPU勝利数
-        new THREE.Vector3(0, -0.05, 0.02)     // メッセージ表示
-      ];
-      const textIds = ['turnText', 'playerText', 'cpuText', 'messageText'];
-      
-      for (let i = 0; i < textLabels.length; i++) {
-        const textGroup = new THREE.Group();
-        textGroup.position.copy(textPositions[i]);
-        textGroup.renderOrder = 53; // テキストを一番前に表示
-        
-        // テキストのサイズと色を調整
-        const size = i === 0 ? 0.15 : i === 3 ? 0.18 : 0.12;
-        const color = i === 0 ? '#4b6cb7' : '#ffffff';
-        
-        const textMesh = createTextureText(textLabels[i], size, color);
-        textMesh.renderOrder = 53; // テキストを一番前に表示
-        textGroup.add(textMesh);
-        textGroup.userData = { 
-          type: 'statusText', 
-          id: textIds[i]
-        };
-        
-        textGroups.push(textGroup);
-        displayGroup.add(textGroup);
-      }
-      
-      // アニメーション用のユーザーデータを追加
-      displayGroup.userData = {
-        ringRotation: 0,
-        glowIntensity: 0,
-        glowDirection: 1
-      };
-      
-      return displayGroup;
-    }
-    
-    // ステータステキストの更新
-    function updateStatusText(id, newText) {
-      if (!statusDisplay) return;
-      
-      statusDisplay.traverse((child) => {
-        if (child.userData && child.userData.type === 'statusText' && child.userData.id === id) {
-          // 既存のテキストメッシュをすべて削除
-          while (child.children.length > 0) {
-            const mesh = child.children[0];
-            child.remove(mesh);
-            if (mesh.geometry) mesh.geometry.dispose();
-            if (mesh.material) {
-              if (Array.isArray(mesh.material)) {
-                mesh.material.forEach(mat => mat.dispose());
-              } else {
-                mesh.material.dispose();
-              }
-            }
-          }
-          
-          // 新しいテキストを作成
-          const size = id === 'turnText' ? 0.15 : id === 'messageText' ? 0.18 : 0.12;
-          const color = id === 'turnText' ? '#4b6cb7' : '#ffffff';
-          const textMesh = createTextureText(newText, size, color);
-          textMesh.renderOrder = 53; // テキストを一番前に表示
-          
-          child.add(textMesh);
-        }
-      });
-    }
-
-    // リングのテクスチャ生成
-    function createRingTexture() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 64;
-      const ctx = canvas.getContext('2d');
-      
-      // グラデーションの作成
-      const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-      gradient.addColorStop(0, 'rgba(75, 108, 183, 0.8)');   // 青
-      gradient.addColorStop(0.3, 'rgba(75, 108, 183, 0.2)'); // 薄い青
-      gradient.addColorStop(0.5, 'rgba(75, 108, 183, 0.8)'); // 青
-      gradient.addColorStop(0.7, 'rgba(75, 108, 183, 0.2)'); // 薄い青
-      gradient.addColorStop(1, 'rgba(75, 108, 183, 0.8)');   // 青
-      
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // ノイズを追加
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-      
-      for (let i = 0; i < data.length; i += 4) {
-        const noise = Math.random() * 0.2;
-        data[i] = data[i] * (1 + noise);
-        data[i + 1] = data[i + 1] * (1 + noise);
-        data[i + 2] = data[i + 2] * (1 + noise);
-      }
-      
-      ctx.putImageData(imageData, 0, 0);
-      
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.repeat.x = 2;
-      return texture;
-    }
-
-    // レンダリングループ内のステータス表示のアニメーション更新
-    function updateStatusDisplay(deltaTime) {
-      if (!statusDisplay) return;
-      
-      const userData = statusDisplay.userData;
-      
-      // ワッカの回転アニメーション（より遅く）
-      userData.ringRotation += deltaTime * 0.02;
-      statusDisplay.children[1].rotation.z = userData.ringRotation;
-      
-      // 光る効果のアニメーション
-      userData.glowIntensity += deltaTime * 0.1 * userData.glowDirection;
-      if (userData.glowIntensity >= 0.2) {
-        userData.glowDirection = -1;
-      } else if (userData.glowIntensity <= 0) {
-        userData.glowDirection = 1;
-      }
-      
-      statusDisplay.children[1].material.emissiveIntensity = userData.glowIntensity;
-    }
-
-    function updateGameMessage(newMessage) {
-      updateStatusText('messageText', newMessage);
-    }
-    
-    function updateStatus() {
-      updateStatusText('turnText', `ターン: ${moveCount}`);
-      updateStatusText('playerText', `プレイヤー: ${playerWins}勝`);
-      updateStatusText('cpuText', `CPU: ${cpuWins}勝`);
-    }
-
-    // -------------------------------
-    // 盤状態の初期化
-    // -------------------------------
-    function initBoard() {
-      boardState = Array(8).fill().map(() => Array(8).fill(0));
-      boardState[3][3] = -1;
-      boardState[3][4] = 1;
-      boardState[4][3] = 1;
-      boardState[4][4] = -1;
-      
-      // 持ち駒数を最大値にリセット
-      // 持ち駒とは盤面にまだ置いていない駒のこと
-      playerRemainingPieces = MAX_PIECES;
-      cpuRemainingPieces = MAX_PIECES;
-    }
-
-    // VR機器検出メッセージを更新する関数
-    function updateDeviceMessage(message, isDetected = false) {
-      const deviceMessage = document.getElementById('device-message');
-      if (deviceMessage) {
-        deviceMessage.textContent = message;
-        if (isDetected) {
-          deviceMessage.style.color = '#4eff9f'; // 検出成功時は緑色に
-          document.querySelector('.device-status .icon').textContent = ''; // 矢印を削除
-        }
-      }
-    }
-
-    // MRモード開始前にVR機器のサポート状況をチェック
-    function checkVRSupport() {
-      if (navigator.xr) {
-        navigator.xr.isSessionSupported('immersive-ar')
-          .then(supported => {
-            if (supported) {
-              updateDeviceMessage('VR機器を検出しました！準備完了', true);
-            } else {
-              updateDeviceMessage('お使いの機器ではVRがサポートされていません');
-            }
-          })
-          .catch(err => {
-            updateDeviceMessage('VR機器の検出中にエラーが発生しました');
-            console.error('VR検出エラー:', err);
-          });
-      } else {
-        updateDeviceMessage('お使いのブラウザはWebXRをサポートしていません');
-      }
-    }
-
-    // -------------------------------
-    // XRセッションの開始
-    // -------------------------------
-    async function startXRSession() {
-      if (!navigator.xr) {
-        alert('WebXRはお使いのブラウザでサポートされていません。');
-        return;
-      }
-      
+    async function startDesktopMode() {
       try {
         // ローディング画面を表示
         const loadingUI = document.getElementById('loadingUI');
@@ -1231,68 +399,18 @@
           loadingUI.style.display = 'flex';
         }
         
-        const supported = await navigator.xr.isSessionSupported('immersive-ar');
-        if (!supported) {
-          if (loadingUI) loadingUI.style.display = 'none';
-          alert('イマーシブARセッションはお使いのデバイスでサポートされていません。');
-          return;
-        }
-        
         // メニューUIを非表示
         document.getElementById('menuUI').style.display = 'none';
         
-        xrSession = await navigator.xr.requestSession('immersive-ar', {
-          requiredFeatures: ['hit-test', 'local-floor'],
-          optionalFeatures: ['dom-overlay'],
-          domOverlay: { root: document.body }
-        });
+        // Three.jsのレンダラーを設定（XRなしの通常のレンダラー）
+        renderer.xr.enabled = false; // XRを無効化
         
-        xrSession.addEventListener('end', () => {
-          xrSession = null;
-          document.getElementById('menuUI').style.display = 'flex';
-          if (loadingUI) loadingUI.style.display = 'none';
-        });
+        // カメラの位置を設定（デスクトップ表示用）
+        camera.position.set(0, 1.5, 1.2);
+        camera.lookAt(0, 0.5, 0);
         
-        renderer.xr.enabled = true;
-        renderer.xr.setReferenceSpaceType('local-floor');
-        renderer.xr.setSession(xrSession);
-
-        // コントローラー設定
-        controllers = [
-          renderer.xr.getController(0),
-          renderer.xr.getController(1)
-        ];
-        
-        controllers.forEach((controller, index) => {
-          controller.addEventListener('select', onSelect);
-          controller.addEventListener('squeezestart', onSqueezeStart);
-          controller.addEventListener('squeezeend', onSqueezeEnd);
-          
-          // レイ（光沢のある青いライン）の追加
-          const rayGeom = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(0, 0, 0),
-            new THREE.Vector3(0, 0, -1)
-          ]);
-          const rayLine = new THREE.Line(
-            rayGeom, 
-            new THREE.LineBasicMaterial({ 
-              color: 0x4b6cb7, 
-              linewidth: 2,
-              transparent: true,
-              opacity: 0.7
-            })
-          );
-          rayLine.name = 'controller-line';
-          rayLine.scale.z = 5;
-          controller.add(rayLine);
-          scene.add(controller);
-        });
-
-        xrReferenceSpace = await xrSession.requestReferenceSpace('local-floor');
-        const viewerSpace = await xrSession.requestReferenceSpace('viewer');
-        xrHitTestSource = await xrSession.requestHitTestSource({ space: viewerSpace });
-
-        renderer.setAnimationLoop(renderFrame);
+        // 通常のアニメーションループを開始
+        renderer.setAnimationLoop(renderDesktopFrame);
         
         // 音声の初期化
         initSounds();
@@ -1303,7 +421,7 @@
         audioLoader.load('osero.mp3', function(buffer) {
           bgm.setBuffer(buffer);
           bgm.setLoop(true);
-          bgm.setVolume(0.3); // お好みで音量調整
+          bgm.setVolume(0.3);
           bgm.play();
         });
         
@@ -1311,2017 +429,344 @@
         setTimeout(() => {
           if (loadingUI) loadingUI.style.display = 'none';
           
-          // MRモードになったら難易度選択メニュー表示
+          // 難易度選択メニュー表示
           placeInitialEnvironment();
-        }, 1500); // 少し遅延して表示
+          
+          // デスクトップモードのマウスコントロールを設定
+          setupDesktopControls();
+        }, 1500);
         
       } catch (error) {
         // エラー時にはローディング画面を非表示に
         const loadingUI = document.getElementById('loadingUI');
         if (loadingUI) loadingUI.style.display = 'none';
         
-        console.error('XRセッション開始中にエラー:', error);
-        alert('XRセッション開始中にエラーが発生しました: ' + error.message);
+        console.error('デスクトップモード開始中にエラー:', error);
+        alert('デスクトップモード開始中にエラーが発生しました: ' + error.message);
       }
     }
 
     // -------------------------------
-    // 初期環境配置
+    // デスクトップモード用レンダリングループ
     // -------------------------------
-    function placeInitialEnvironment() {
-      // 難易度選択メニューを作成して目の前に配置（位置調整）
-      difficultyMenu = createDifficultyMenu();
-      difficultyMenu.position.set(0, 1.3, -1.1); // Z座標を-1.3から-1.1に変更（より手前に）
-      // ユーザーデータにfaceCamera=trueフラグを追加して、カメラの方向を常に向くように
-      difficultyMenu.userData.faceCamera = true;
-      scene.add(difficultyMenu);
-      difficultySelected = false;
+    function renderDesktopFrame(time) {
+      const deltaTime = 1;
       
-      // お出迎けパーティクルエフェクトを追加（これは残す）
-      createWelcomeEffect();
+      // ステータス表示のアニメーション更新
+      updateStatusDisplay(deltaTime);
       
-      // 効果音
-      playSound('start');
-    }
-
-    // -------------------------------
-    // お出迎えエフェクト
-    // -------------------------------
-    function createWelcomeEffect() {
-      // 空間全体に漂うパーティクル
-      for (let i = 0; i < 6; i++) { // 3個から6個に増加
-        const particleSystem = createWelcomeParticles();
+      // 有効手マーカーのアニメーション更新
+      updateValidMoveMarkers(deltaTime);
+      
+      // 駒のフリップアニメーションを更新
+      updateFlippingPieces(deltaTime);
+      
+      // 駒を落とすアニメーションを更新
+      updateDroppingPieces(deltaTime);
+      
+      // フェードインアニメーションの更新
+      if (difficultyMenu && difficultyMenu.userData && difficultyMenu.userData.fadeIn) {
+        const fadeProgress = difficultyMenu.userData.fadeProgress;
+        const fadeSpeed = difficultyMenu.userData.fadeSpeed;
         
-        // 最初は中央付近に配置
-        particleSystem.position.set(
-          (Math.random() - 0.5) * 0.5, // 範囲を狭く
-          1.3 + (Math.random() - 0.5) * 0.3, // ほぼ視界中央の高さ
-          -1.1 + (Math.random() - 0.5) * 0.5  // -1.3から-1.1に変更（より手前に）
-        );
-        
-        scene.add(particleSystem);
-        welcomeParticles.push(particleSystem);
-        
-        // 中央から外側に移動するベクトルを設定
-        const moveDirection = new THREE.Vector3(
-          (Math.random() - 0.5) * 2.5, // 横方向の拡散範囲
-          (Math.random() - 0.5) * 1.2, // 縦方向の拡散範囲
-          (Math.random() - 0.5) * 2.5  // 前後方向の拡散範囲
-        ).normalize().multiplyScalar(0.025); // 速度
-        
-        particleSystem.userData.moveDirection = moveDirection;
-        particleSystem.userData.initialPosition = particleSystem.position.clone();
-        particleSystem.userData.expansionPhase = true; // 拡散フェーズフラグ
-        particleSystem.userData.expansionTime = 0; // 拡散タイマー
-        particleSystem.userData.maxExpansionTime = 50 + Math.random() * 30; // 拡散時間
-        
-        // 描画順序を制御するためのrenderOrder設定
-        particleSystem.renderOrder = 1; // より低い値にして確実に背面に表示
-      }
-      
-      // ゲーム開始時の星型パーティクルを直接作成して追加
-      const starBurstParticleTexture = createStarParticleTexture();
-      const starBurstGeometry = new THREE.BufferGeometry();
-      const starParticleCount = 75; // 星の数
-      
-      const starPositions = new Float32Array(starParticleCount * 3);
-      const starColors = new Float32Array(starParticleCount * 3);
-      const starSizes = new Float32Array(starParticleCount);
-      const starVelocities = [];
-      
-      // 星用のカラーパレット（金色と白色）
-      const starColors1 = [
-        new THREE.Color(0xffd700), // ゴールド
-        new THREE.Color(0xffec85), // 淡いゴールド
-        new THREE.Color(0xffffaa), // 非常に淡いゴールド
-        new THREE.Color(0xffffff), // 白
-      ];
-      
-      // 全方向に飛び散る星型パーティクル
-      for (let i = 0; i < starParticleCount; i++) {
-        const i3 = i * 3;
-        
-        // 中心からほぼ0の位置からスタート
-        starPositions[i3] = (Math.random() - 0.5) * 0.1;
-        starPositions[i3 + 1] = (Math.random() - 0.5) * 0.1;
-        starPositions[i3 + 2] = (Math.random() - 0.5) * 0.1;
-        
-        // 色はランダムに金〜白
-        const color = starColors1[Math.floor(Math.random() * starColors1.length)];
-        starColors[i3] = color.r;
-        starColors[i3 + 1] = color.g;
-        starColors[i3 + 2] = color.b;
-        
-        // サイズもランダム（中くらい〜大きめ）
-        starSizes[i] = Math.random() * 0.04 + 0.02;
-        
-        // 速度ベクトル（上向きを中心に広がる）
-        const upwardBias = 0.75; // 上向きのバイアス
-        const horizontalSpread = 0.35; // 横方向への広がり
-        
-        // 上方向の基本速度（星型は少し速く）- 速度を遅くする
-        let baseY = Math.random() * 0.025 + 0.025; // 基本速度
-        
-        // 横方向（X, Z）の速度
-        const angle = Math.random() * Math.PI * 2; // 水平方向のランダムな角度
-        const horizontalSpeed = Math.random() * horizontalSpread * 0.05;
-        const vx = Math.cos(angle) * horizontalSpeed;
-        const vz = Math.sin(angle) * horizontalSpeed;
-        
-        // 上方向を維持しつつ、少しだけランダム性を加える
-        const vy = baseY * (upwardBias + (1.0 - upwardBias) * Math.random());
-        
-        starVelocities.push({
-          x: vx,
-          y: vy,
-          z: vz,
-          gravity: Math.random() * 0.0003 + 0.0001, // 重力
-          decay: Math.random() * 0.01 + 0.005 // 減衰率
-        });
-      }
-      
-      starBurstGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-      starBurstGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
-      starBurstGeometry.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
-      
-      // 星型パーティクル用マテリアル
-      const starBurstMaterial = new THREE.PointsMaterial({
-        size: 0.06,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.9,
-        depthWrite: false,
-        depthTest: true,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-        map: starBurstParticleTexture
-      });
-      
-      const starBurstSystem = new THREE.Points(starBurstGeometry, starBurstMaterial);
-      starBurstSystem.position.set(0, 1.3, -1.1); // -1.3から-1.1に変更（より手前に）
-      starBurstSystem.renderOrder = 1;
-      
-      // 爆発用のユーザーデータ
-      starBurstSystem.userData = {
-        velocities: starVelocities,
-        burst: true,
-        lifetime: 0,
-        maxLifetime: 100,
-        originalSizes: starSizes.slice(),
-        isStar: true // 星型パーティクルであることを示すフラグ
-      };
-      
-      scene.add(starBurstSystem);
-      welcomeParticles.push(starBurstSystem);
-      console.log('専用の星型パーティクルを追加しました');
-      
-      // 開始時のパーティクル爆発エフェクト（従来の丸いパーティクル）
-      const burstParticles = createBurstParticles();
-      burstParticles.position.set(0, 1.3, -1.1); // -1.3から-1.1に変更（より手前に）
-      burstParticles.renderOrder = 1; // より低い値にして確実に背面に表示
-      scene.add(burstParticles);
-      welcomeParticles.push(burstParticles);
-      
-      // バーストパーティクルの星型パーティクルシステムも追加
-      if (burstParticles.userData.starSystem) {
-        const starSystem = burstParticles.userData.starSystem;
-        starSystem.position.copy(burstParticles.position);
-        starSystem.renderOrder = 1;
-        scene.add(starSystem);
-        welcomeParticles.push(starSystem);
-        console.log('大きい星型パーティクル追加');
-      }
-      
-      // バリエーション用に異なるタイプのバースト効果を追加
-      const smallBurstParticles = createSmallBurstParticles();
-      smallBurstParticles.position.set(0, 1.3, -1.1); // -1.3から-1.1に変更（より手前に）
-      smallBurstParticles.renderOrder = 1; // より低い値にして確実に背面に表示
-      scene.add(smallBurstParticles);
-      welcomeParticles.push(smallBurstParticles);
-      
-      // 小さいバーストパーティクルの星型パーティクルシステムも追加
-      if (smallBurstParticles.userData.starSystem) {
-        const starSystem = smallBurstParticles.userData.starSystem;
-        starSystem.position.copy(smallBurstParticles.position);
-        starSystem.renderOrder = 1;
-        scene.add(starSystem);
-        welcomeParticles.push(starSystem);
-        console.log('小さい星型パーティクル追加');
-      }
-    }
-
-    // より小さく速いパーティクルバースト
-    function createSmallBurstParticles() {
-      const particleCount = 200; // 小さいパーティクルはたくさん
-      const geometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(particleCount * 3);
-      const colors = new Float32Array(particleCount * 3);
-      const sizes = new Float32Array(particleCount);
-      const velocities = [];
-      
-      // 青～紫～白のカラーパレット（ゴールドと違うバリエーション）
-      const coolColors = [
-        new THREE.Color(0x4b6cb7), // 青
-        new THREE.Color(0x8a6bc9), // 紫
-        new THREE.Color(0xb3e5fc), // 水色
-        new THREE.Color(0xffffff), // 白
-      ];
-      
-      // 主に上向きに飛び散るパーティクル
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        
-        // 中心からほぼ0の位置からスタート
-        positions[i3] = (Math.random() - 0.5) * 0.05;
-        positions[i3 + 1] = (Math.random() - 0.5) * 0.05;
-        positions[i3 + 2] = (Math.random() - 0.5) * 0.05;
-        
-        // 色はランダムに青～紫～白
-        const color = coolColors[Math.floor(Math.random() * coolColors.length)];
-        colors[i3] = color.r;
-        colors[i3 + 1] = color.g;
-        colors[i3 + 2] = color.b;
-        
-        // サイズは小さめ
-        sizes[i] = Math.random() * 0.01 + 0.002;
-        
-        // 速度ベクトル（上向きを中心に広がる）
-        const upwardBias = 0.8; // 上向きのバイアス（小さいパーティクルはより上向きに）
-        const horizontalSpread = 0.3; // 横方向への広がり（小さいパーティクルは横方向の広がりを抑える）
-        
-        // 上方向の基本速度（小さいパーティクルは速くする）- 速度を遅くする
-        let baseY = Math.random() * 0.03 + 0.025; // 0.05+0.05から0.03+0.025に変更
-        
-        // 横方向（X, Z）の速度
-        const angle = Math.random() * Math.PI * 2; // 水平方向のランダムな角度
-        const horizontalSpeed = Math.random() * horizontalSpread * 0.05;
-        const vx = Math.cos(angle) * horizontalSpeed;
-        const vz = Math.sin(angle) * horizontalSpeed;
-        
-        // 上方向を維持しつつ、少しだけランダム性を加える
-        const vy = baseY * (upwardBias + (1.0 - upwardBias) * Math.random());
-        
-        velocities.push({
-          x: vx,
-          y: vy,
-          z: vz,
-          gravity: Math.random() * 0.0003 + 0.0001, // 重力も軽減
-          decay: Math.random() * 0.02 + 0.01 // 減衰率（小さいパーティクルは早めに消える）
-        });
-      }
-      
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-      
-      // テクスチャ作成
-      const normalParticleTexture = createParticleTexture();
-      const starParticleTexture = createStarParticleTexture();
-      
-      // 通常のパーティクル用マテリアル（半分のパーティクル用）
-      const normalMaterial = new THREE.PointsMaterial({
-        size: 0.01,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.7,
-        depthWrite: false,
-        depthTest: true,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-        map: normalParticleTexture
-      });
-      
-      // 星形パーティクル用マテリアル（残りの半分用）
-      const starMaterial = new THREE.PointsMaterial({
-        size: 0.025, // より大きく
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.8, // より不透明に
-        depthWrite: false,
-        depthTest: true,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-        map: starParticleTexture
-      });
-      
-      // 2つのパーティクルシステム作成
-      const normalParticleCount = Math.floor(particleCount / 2);
-      const starParticleCount = particleCount - normalParticleCount;
-      
-      // 通常パーティクル用のジオメトリ
-      const normalGeometry = new THREE.BufferGeometry();
-      normalGeometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(0, normalParticleCount * 3), 3));
-      normalGeometry.setAttribute('color', new THREE.BufferAttribute(colors.slice(0, normalParticleCount * 3), 3));
-      normalGeometry.setAttribute('size', new THREE.BufferAttribute(sizes.slice(0, normalParticleCount), 1));
-      
-      // 星型パーティクル用のジオメトリ
-      const starGeometry = new THREE.BufferGeometry();
-      starGeometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(normalParticleCount * 3), 3));
-      starGeometry.setAttribute('color', new THREE.BufferAttribute(colors.slice(normalParticleCount * 3), 3));
-      starGeometry.setAttribute('size', new THREE.BufferAttribute(sizes.slice(normalParticleCount), 1));
-      
-      // 2つのパーティクルシステム作成
-      const normalSystem = new THREE.Points(normalGeometry, normalMaterial);
-      const starSystem = new THREE.Points(starGeometry, starMaterial);
-      
-      // メインのパーティクルシステム（通常パーティクル）
-      const particleSystem = normalSystem;
-      
-      // 爆発用のユーザーデータ
-      particleSystem.userData = {
-        velocities: velocities.slice(0, normalParticleCount),
-        burst: true,
-        lifetime: 0,
-        maxLifetime: 80,
-        originalSizes: sizes.slice(0, normalParticleCount)
-      };
-      
-      // 星型パーティクルシステムにも同様のデータを設定
-      starSystem.userData = {
-        velocities: velocities.slice(normalParticleCount),
-        burst: true,
-        lifetime: 0,
-        maxLifetime: 80,
-        originalSizes: sizes.slice(normalParticleCount),
-        isStarParticle: true // 星型パーティクルであることを示すフラグ
-      };
-      
-      // 星型パーティクルシステムを親システムに関連付け
-      particleSystem.userData.starSystem = starSystem;
-      
-      return particleSystem;
-    }
-
-    // 既存の爆発パーティクルも修正
-    function createBurstParticles() {
-      const particleCount = 300; // 多めのパーティクル
-      const geometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(particleCount * 3);
-      const colors = new Float32Array(particleCount * 3);
-      const sizes = new Float32Array(particleCount);
-      const velocities = [];
-      
-      // カラーパレット（金色〜白）
-      const goldColors = [
-        new THREE.Color(0xffd700), // ゴールド
-        new THREE.Color(0xffec85), // 淡いゴールド
-        new THREE.Color(0xffffaa), // 非常に淡いゴールド
-        new THREE.Color(0xffffff), // 白
-      ];
-      
-      // 主に上向きに飛び散るパーティクル
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        
-        // 中心からほぼ0の位置からスタート
-        positions[i3] = (Math.random() - 0.5) * 0.1;
-        positions[i3 + 1] = (Math.random() - 0.5) * 0.1;
-        positions[i3 + 2] = (Math.random() - 0.5) * 0.1;
-        
-        // 色はランダムに金〜白
-        const color = goldColors[Math.floor(Math.random() * goldColors.length)];
-        colors[i3] = color.r;
-        colors[i3 + 1] = color.g;
-        colors[i3 + 2] = color.b;
-        
-        // サイズもランダム（小さめ〜大きめ）
-        sizes[i] = Math.random() * 0.03 + 0.005;
-        
-        // 速度ベクトル（上向きを中心に広がる）
-        const upwardBias = 0.7; // 上向きのバイアス（0.0-1.0、1.0に近いほど上向き）
-        const horizontalSpread = 0.4; // 横方向への広がり
-        
-        // 上方向の基本速度
-        let baseY = Math.random() * 0.04 + 0.04; // 上方向のベース速度
-        
-        // 横方向（X, Z）の速度
-        const angle = Math.random() * Math.PI * 2; // 水平方向のランダムな角度
-        const horizontalSpeed = Math.random() * horizontalSpread * 0.05;
-        const vx = Math.cos(angle) * horizontalSpeed;
-        const vz = Math.sin(angle) * horizontalSpeed;
-        
-        // 上方向を維持しつつ、少しだけランダム性を加える
-        const vy = baseY * (upwardBias + (1.0 - upwardBias) * Math.random());
-        
-        velocities.push({
-          x: vx,
-          y: vy,
-          z: vz,
-          gravity: Math.random() * 0.0006 + 0.0002, // 重力を強めに
-          decay: Math.random() * 0.01 + 0.005 // 減衰率
-        });
-      }
-      
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-      
-      // テクスチャ作成
-      const normalParticleTexture = createParticleTexture();
-      const starParticleTexture = createStarParticleTexture();
-      
-      // 通常のパーティクル用マテリアル（半分のパーティクル用）
-      const normalMaterial = new THREE.PointsMaterial({
-        size: 0.05, // より大きく
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.8, // より不透明に
-        depthWrite: false,
-        depthTest: true,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-        map: normalParticleTexture
-      });
-      
-      // 星形パーティクル用マテリアル（残りの半分用）
-      const starMaterial = new THREE.PointsMaterial({
-        size: 0.05, // より大きく
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.8, // より不透明に
-        depthWrite: false,
-        depthTest: true,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-        map: starParticleTexture
-      });
-      
-      // 2つのパーティクルシステム作成
-      const normalParticleCount = Math.floor(particleCount / 2);
-      const starParticleCount = particleCount - normalParticleCount;
-      
-      // 通常パーティクル用のジオメトリ
-      const normalGeometry = new THREE.BufferGeometry();
-      normalGeometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(0, normalParticleCount * 3), 3));
-      normalGeometry.setAttribute('color', new THREE.BufferAttribute(colors.slice(0, normalParticleCount * 3), 3));
-      normalGeometry.setAttribute('size', new THREE.BufferAttribute(sizes.slice(0, normalParticleCount), 1));
-      
-      // 星型パーティクル用のジオメトリ
-      const starGeometry = new THREE.BufferGeometry();
-      starGeometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(normalParticleCount * 3), 3));
-      starGeometry.setAttribute('color', new THREE.BufferAttribute(colors.slice(normalParticleCount * 3), 3));
-      starGeometry.setAttribute('size', new THREE.BufferAttribute(sizes.slice(normalParticleCount), 1));
-      
-      // 2つのパーティクルシステム作成
-      const normalSystem = new THREE.Points(normalGeometry, normalMaterial);
-      const starSystem = new THREE.Points(starGeometry, starMaterial);
-      
-      // メインのパーティクルシステム（通常パーティクル）
-      const particleSystem = normalSystem;
-      
-      // 爆発用のユーザーデータ
-      particleSystem.userData = {
-        velocities: velocities.slice(0, normalParticleCount),
-        burst: true,
-        lifetime: 0,
-        maxLifetime: 100,
-        originalSizes: sizes.slice(0, normalParticleCount)
-      };
-      
-      // 星型パーティクルシステムにも同様のデータを設定
-      starSystem.userData = {
-        velocities: velocities.slice(normalParticleCount),
-        burst: true,
-        lifetime: 0,
-        maxLifetime: 100,
-        originalSizes: sizes.slice(normalParticleCount),
-        isStarParticle: true // 星型パーティクルであることを示すフラグ
-      };
-      
-      // 星型パーティクルシステムを親システムに関連付け
-      particleSystem.userData.starSystem = starSystem;
-      
-      return particleSystem;
-    }
-
-    // 通常のパーティクルも修正
-    function createWelcomeParticles() {
-      const particleCount = 200; // 100から200に増加
-      const geometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(particleCount * 3);
-      const colors = new Float32Array(particleCount * 3);
-      const sizes = new Float32Array(particleCount);
-      
-      // 金色のパレット（より多様なバリエーション）
-      const goldColors = [
-        new THREE.Color(0xffd700), // ゴールド
-        new THREE.Color(0xf0e68c), // カーキ
-        new THREE.Color(0xdaa520), // ゴールデンロッド
-        new THREE.Color(0xffe4b5), // モカシン
-        new THREE.Color(0xd4af37), // 金色
-        new THREE.Color(0xffec85), // 淡いゴールド
-        new THREE.Color(0xbda55d)  // 落ち着いたゴールド
-      ];
-      
-      // パーティクル初期設定
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        
-        // 初期位置は小さな球体内に集中
-        const radius = 0.2 + Math.random() * 0.2;
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.random() * Math.PI;
-        
-        positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
-        positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
-        positions[i3 + 2] = radius * Math.cos(phi);
-        
-        // ランダムな金色
-        const color = goldColors[Math.floor(Math.random() * goldColors.length)];
-        colors[i3] = color.r;
-        colors[i3 + 1] = color.g;
-        colors[i3 + 2] = color.b;
-        
-        // サイズもバリエーション
-        sizes[i] = Math.random() * 0.03 + 0.01;
-      }
-      
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-      
-      // 通常パーティクルと星型パーティクルに分ける
-      const normalParticleCount = Math.ceil(particleCount * 0.7); // 70%は通常パーティクル
-      const starParticleCount = particleCount - normalParticleCount; // 30%は星型パーティクル
-      
-      // 通常パーティクル用のジオメトリ
-      const normalGeometry = new THREE.BufferGeometry();
-      normalGeometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(0, normalParticleCount * 3), 3));
-      normalGeometry.setAttribute('color', new THREE.BufferAttribute(colors.slice(0, normalParticleCount * 3), 3));
-      normalGeometry.setAttribute('size', new THREE.BufferAttribute(sizes.slice(0, normalParticleCount), 1));
-      
-      // 星型パーティクル用のジオメトリ
-      const starGeometry = new THREE.BufferGeometry();
-      starGeometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(normalParticleCount * 3), 3));
-      starGeometry.setAttribute('color', new THREE.BufferAttribute(colors.slice(normalParticleCount * 3), 3));
-      starGeometry.setAttribute('size', new THREE.BufferAttribute(sizes.slice(normalParticleCount), 1));
-      
-      // テクスチャ作成
-      const normalParticleTexture = createParticleTexture();
-      const starParticleTexture = createStarParticleTexture();
-      
-      // 通常のパーティクル用マテリアル
-      const material = new THREE.PointsMaterial({
-        size: 0.05,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.7,
-        depthWrite: false, // 深度書き込みをオフ
-        depthTest: true, // 深度テストは有効
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-        map: normalParticleTexture
-      });
-      
-      // 星型パーティクル用マテリアル
-      const starMaterial = new THREE.PointsMaterial({
-        size: 0.05,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.7,
-        depthWrite: false,
-        depthTest: true,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-        map: starParticleTexture
-      });
-      
-      // 2つのパーティクルシステム作成
-      const normalSystem = new THREE.Points(normalGeometry, material);
-      const starSystem = new THREE.Points(starGeometry, starMaterial);
-      
-      // メインのパーティクルシステム（通常パーティクル）をベースにする
-      const particleSystem = normalSystem;
-      
-      // アニメーション用データ
-      const velocities = Array(particleCount).fill().map(() => ({
-        x: (Math.random() - 0.5) * 0.002,
-        y: (Math.random() - 0.5) * 0.002,
-        z: (Math.random() - 0.5) * 0.002
-      }));
-      
-      particleSystem.userData = {
-        velocities: velocities.slice(0, normalParticleCount),
-        rotationSpeed: (Math.random() - 0.5) * 0.001,
-        originalPositions: positions.slice(0, normalParticleCount * 3),
-        originalSizes: sizes.slice(0, normalParticleCount),
-        starSystem: starSystem, // 星型パーティクルシステムへの参照を保持
-      };
-      
-      // 星型パーティクルシステムにもデータを設定
-      starSystem.userData = {
-        velocities: velocities.slice(normalParticleCount),
-        rotationSpeed: (Math.random() - 0.5) * 0.001,
-        originalPositions: positions.slice(normalParticleCount * 3),
-        originalSizes: sizes.slice(normalParticleCount),
-        isStar: true
-      };
-      
-      // 星型パーティクルシステムをメインシステムの子として追加
-      particleSystem.add(starSystem);
-      
-      return particleSystem;
-    }
-
-    // パーティクル用のテクスチャ作成
-    function createParticleTexture() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 128;
-      canvas.height = 128;
-      const ctx = canvas.getContext('2d');
-      
-      // 輝く光のようなグラデーション
-      const gradient = ctx.createRadialGradient(
-        canvas.width / 2, canvas.height / 2, 0,
-        canvas.width / 2, canvas.height / 2, canvas.width / 2
-      );
-      
-      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      gradient.addColorStop(0.2, 'rgba(255, 255, 220, 0.8)');
-      gradient.addColorStop(0.5, 'rgba(255, 220, 150, 0.3)');
-      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)'); // 完全に透明に修正
-      
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // キャンバスをクリア
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2);
-      ctx.fill();
-      
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.needsUpdate = true;
-      return texture;
-    }
-
-    // 星型パーティクル用のテクスチャ作成
-    function createStarParticleTexture() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 128;
-      canvas.height = 128;
-      const ctx = canvas.getContext('2d');
-      
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const outerRadius = canvas.width / 2 - 10;
-      const innerRadius = outerRadius / 3; // より明確な星の形のために内側の半径を小さく
-      const spikes = 5; // 5つの頂点を持つ星
-      
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // 星をより明確に描画
-      ctx.beginPath();
-      
-      // 星を描くための正確な方法
-      for (let i = 0; i < spikes * 2; i++) {
-        const radius = i % 2 === 0 ? outerRadius : innerRadius;
-        const angle = (Math.PI * i) / spikes - Math.PI / 2;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      
-      ctx.closePath();
-      
-      // 明るい金色のベースカラー
-      ctx.fillStyle = '#FFD700';
-      ctx.fill();
-      
-      // グラデーションを適用（より明るい色に）
-      const gradient = ctx.createRadialGradient(
-        centerX, centerY, 0,
-        centerX, centerY, outerRadius
-      );
-      
-      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      gradient.addColorStop(0.3, 'rgba(255, 255, 220, 0.9)');
-      gradient.addColorStop(0.7, 'rgba(255, 220, 150, 0.6)');
-      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      
-      ctx.fillStyle = gradient;
-      ctx.fill();
-      
-      // 星の輪郭を強調
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      
-      // 光の効果を加える（中心から放射する線）
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      
-      // 放射状の線を描画
-      for (let i = 0; i < spikes; i++) {
-        const angle = (Math.PI * 2 * i) / spikes - Math.PI / 2;
-        const x = centerX + outerRadius * 1.2 * Math.cos(angle);
-        const y = centerY + outerRadius * 1.2 * Math.sin(angle);
-        
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY);
-        ctx.lineTo(x, y);
-        ctx.strokeStyle = 'rgba(255, 255, 200, 0.4)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-      
-      ctx.restore();
-      
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.needsUpdate = true;
-      return texture;
-    }
-
-    // お出迎えパーティクルの更新
-    function updateWelcomeParticles(deltaTime) {
-      if (!welcomeParticles || welcomeParticles.length === 0) return;
-      
-      try {
-        for (const particle of welcomeParticles) {
-          if (!particle || !particle.geometry || !particle.geometry.attributes) continue;
+        if (fadeProgress < 1) {
+          // フェードイン進行中
+          difficultyMenu.userData.fadeProgress = Math.min(fadeProgress + fadeSpeed, 1);
+          const opacity = easeOutCubic(difficultyMenu.userData.fadeProgress);
           
-          // 爆発タイプのパーティクル
-          if (particle.userData.burst) {
-            updateBurstParticles(particle, deltaTime);
-            continue;
-          }
-          
-          // システム全体の移動（拡散フェーズ）
-          if (particle.userData.expansionPhase) {
-            particle.userData.expansionTime += deltaTime;
-            
-            if (particle.userData.expansionTime < particle.userData.maxExpansionTime) {
-              // 拡散中
-              const moveDirection = particle.userData.moveDirection;
-              const initialPosition = particle.userData.initialPosition;
-              const progress = particle.userData.expansionTime / particle.userData.maxExpansionTime;
-              
-              // イージング関数（徐々に減速）
-              const easeOutCubic = 1 - Math.pow(1 - progress, 3);
-              const expansion = 3.0 * easeOutCubic; // 最大3ユニットまで拡散
-              
-              particle.position.x = initialPosition.x + moveDirection.x * expansion;
-              particle.position.y = initialPosition.y + moveDirection.y * expansion;
-              particle.position.z = initialPosition.z + moveDirection.z * expansion;
-            } else {
-              // 拡散完了
-              particle.userData.expansionPhase = false;
-            }
-          }
-          
-          // 回転
-          if (particle.userData && particle.userData.rotationSpeed) {
-            particle.rotation.y += particle.userData.rotationSpeed;
-          }
-          
-          // パーティクル位置の更新
-          const positions = particle.geometry.attributes.position.array;
-          if (!positions) continue;
-          
-          const velocities = particle.userData?.velocities;
-          const originalPositions = particle.userData?.originalPositions;
-          
-          if (!velocities || !originalPositions) continue;
-          
-          for (let i = 0; i < positions.length / 3; i++) {
-            const i3 = i * 3;
-            
-            // なめらかな揺れ動き（サイン波の利用）
-            const time = Date.now() * 0.001;
-            const offsetX = Math.sin(time + i * 0.1) * 0.01;
-            const offsetY = Math.cos(time + i * 0.1) * 0.01;
-            const offsetZ = Math.sin(time * 0.8 + i * 0.1) * 0.01;
-            
-            if (i3 + 2 < positions.length && i3 + 2 < originalPositions.length) {
-              positions[i3] = originalPositions[i3] + offsetX;
-              positions[i3 + 1] = originalPositions[i3 + 1] + offsetY;
-              positions[i3 + 2] = originalPositions[i3 + 2] + offsetZ;
-              
-              // 速度でもゆっくり位置を更新
-              originalPositions[i3] += velocities[i].x * deltaTime;
-              originalPositions[i3 + 1] += velocities[i].y * deltaTime;
-              originalPositions[i3 + 2] += velocities[i].z * deltaTime;
-              
-              // 範囲を超えたら反対側から
-              const maxRange = 1.5;
-              if (Math.abs(originalPositions[i3]) > maxRange) velocities[i].x *= -1;
-              if (Math.abs(originalPositions[i3 + 1]) > maxRange) velocities[i].y *= -1;
-              if (Math.abs(originalPositions[i3 + 2]) > maxRange) velocities[i].z *= -1;
-            }
-          }
-          
-          particle.geometry.attributes.position.needsUpdate = true;
-          
-          // キラキラエフェクト（サイズと透明度のアニメーション）
-          if (particle.geometry.attributes.size) {
-            const time = Date.now() * 0.001;
-            const sizes = particle.geometry.attributes.size;
-            const sizeArray = sizes.array;
-            const originalSizes = particle.userData.originalSizes;
-            
-            for (let i = 0; i < sizeArray.length; i++) {
-              const pulseFactor = 0.3 * Math.sin(time * 2 + i * 0.2) + 1;
-              sizeArray[i] = (originalSizes ? originalSizes[i] : 0.02) * pulseFactor;
-            }
-            
-            sizes.needsUpdate = true;
-          }
-          
-          // 全体の透明度もわずかに変化
-          if (particle.material) {
-            const time = Date.now() * 0.001;
-            particle.material.opacity = 0.6 + 0.2 * Math.sin(time * 0.5);
-          }
-          
-          // 星型パーティクルシステムも更新（あれば）
-          if (!particle.userData.isStar && particle.userData.starSystem) {
-            const starSystem = particle.userData.starSystem;
-            
-            // 星型パーティクルシステム用の揺れ動きを更新（サイン波をずらす）
-            const starPositions = starSystem.geometry.attributes.position.array;
-            const starVelocities = starSystem.userData.velocities;
-            const starOriginalPositions = starSystem.userData.originalPositions;
-            
-            if (starPositions && starVelocities && starOriginalPositions) {
-              const time = Date.now() * 0.001 + 0.5; // 通常パーティクルと位相をずらす
-              
-              for (let i = 0; i < starPositions.length / 3; i++) {
-                const i3 = i * 3;
+          // メニューの全要素の透明度を更新
+          difficultyMenu.traverse(child => {
+            if (child.material && child.material.transparent) {
+              if (child.material.opacity !== undefined) {
+                // コンポーネントタイプに基づいて目標の不透明度を設定
+                let targetOpacity = 0.9; // デフォルト
                 
-                // 星用の揺れ動き（通常より大きめに）
-                const offsetX = Math.sin(time + i * 0.12) * 0.015;
-                const offsetY = Math.cos(time + i * 0.12) * 0.015;
-                const offsetZ = Math.sin(time * 0.9 + i * 0.12) * 0.015;
-                
-                if (i3 + 2 < starPositions.length && i3 + 2 < starOriginalPositions.length) {
-                  starPositions[i3] = starOriginalPositions[i3] + offsetX;
-                  starPositions[i3 + 1] = starOriginalPositions[i3 + 1] + offsetY;
-                  starPositions[i3 + 2] = starOriginalPositions[i3 + 2] + offsetZ;
-                  
-                  // 速度でもゆっくり位置を更新
-                  starOriginalPositions[i3] += starVelocities[i].x * deltaTime;
-                  starOriginalPositions[i3 + 1] += starVelocities[i].y * deltaTime;
-                  starOriginalPositions[i3 + 2] += starVelocities[i].z * deltaTime;
-                  
-                  // 範囲を超えたら反対側から
-                  const maxRange = 1.5;
-                  if (Math.abs(starOriginalPositions[i3]) > maxRange) starVelocities[i].x *= -1;
-                  if (Math.abs(starOriginalPositions[i3 + 1]) > maxRange) starVelocities[i].y *= -1;
-                  if (Math.abs(starOriginalPositions[i3 + 2]) > maxRange) starVelocities[i].z *= -1;
-                }
-              }
-              
-              starSystem.geometry.attributes.position.needsUpdate = true;
-              
-              // 星型パーティクルのキラキラ効果（通常より強め）
-              if (starSystem.geometry.attributes.size) {
-                const time = Date.now() * 0.001 + 0.5; // 時間をずらす
-                const sizes = starSystem.geometry.attributes.size;
-                const sizeArray = sizes.array;
-                const originalSizes = starSystem.userData.originalSizes;
-                
-                for (let i = 0; i < sizeArray.length; i++) {
-                  const pulseFactor = 0.4 * Math.sin(time * 2.2 + i * 0.3) + 1;
-                  sizeArray[i] = (originalSizes ? originalSizes[i] : 0.02) * pulseFactor;
+                if (child.userData && child.userData.type === 'startButton') {
+                  targetOpacity = 0.9;
+                } else if (child === difficultyMenu.children[1]) { // フレーム
+                  targetOpacity = 0.8;
                 }
                 
-                sizes.needsUpdate = true;
-              }
-              
-              // 星型パーティクルの透明度変化（通常より強め）
-              if (starSystem.material) {
-                const time = Date.now() * 0.001 + 0.5;
-                starSystem.material.opacity = 0.65 + 0.25 * Math.sin(time * 0.7);
+                child.material.opacity = opacity * targetOpacity;
               }
             }
-          }
-        }
-      } catch (e) {
-        console.error('エラー in updateWelcomeParticles:', e);
-      }
-    }
-
-    // 爆発エフェクトのパーティクル更新
-    function updateBurstParticles(particle, deltaTime) {
-      const positions = particle.geometry.attributes.position.array;
-      const velocities = particle.userData.velocities;
-      
-      // ライフタイム更新
-      particle.userData.lifetime += deltaTime;
-      const progress = particle.userData.lifetime / particle.userData.maxLifetime;
-      
-      // すべてのパーティクルを更新
-      for (let i = 0; i < positions.length / 3; i++) {
-        const i3 = i * 3;
-        const vel = velocities[i];
-        
-        // 重力と減衰を適用した位置更新
-        positions[i3] += vel.x;
-        positions[i3 + 1] += vel.y;
-        positions[i3 + 2] += vel.z;
-        
-        // 速度の更新（重力と減衰）
-        vel.y -= vel.gravity;
-        vel.x *= (1 - vel.decay);
-        vel.y *= (1 - vel.decay);
-        vel.z *= (1 - vel.decay);
-      }
-      
-      particle.geometry.attributes.position.needsUpdate = true;
-      
-      // 全体の透明度減少
-      particle.material.opacity = 1 - Math.pow(progress, 0.7);
-      
-      // サイズの縮小
-      if (particle.geometry.attributes.size) {
-        const sizes = particle.geometry.attributes.size.array;
-        const originalSizes = particle.userData.originalSizes;
-        
-        for (let i = 0; i < sizes.length; i++) {
-          sizes[i] = originalSizes[i] * (1 - Math.pow(progress, 0.5));
-        }
-        
-        particle.geometry.attributes.size.needsUpdate = true;
-      }
-      
-      // 星型パーティクルシステムがある場合は同期させる
-      if (!particle.userData.isStarParticle && particle.userData.starSystem) {
-        const starSystem = particle.userData.starSystem;
-        // ライフタイムが同じになるように更新
-        starSystem.userData.lifetime = particle.userData.lifetime;
-        updateBurstParticles(starSystem, 0); // deltaTimeは0、既に更新済みのため
-      }
-      
-      // ライフタイム終了したらシーンから削除
-      if (progress >= 1) {
-        scene.remove(particle);
-        const index = welcomeParticles.indexOf(particle);
-        if (index > -1) {
-          welcomeParticles.splice(index, 1);
-        }
-        
-        // 星型パーティクルシステムも削除
-        if (!particle.userData.isStarParticle && particle.userData.starSystem) {
-          const starSystem = particle.userData.starSystem;
-          scene.remove(starSystem);
-          const starIndex = welcomeParticles.indexOf(starSystem);
-          if (starIndex > -1) {
-            welcomeParticles.splice(starIndex, 1);
-          }
-        }
-      }
-    }
-
-    // お出迎え効果音の再生
-    function playWelcomeSound() {
-      if (!listener || !listener.context) {
-        console.warn('Audio listener not initialized');
-        return;
-      }
-      
-      const context = listener.context;
-      const gainNode = context.createGain();
-      gainNode.connect(context.destination);
-      gainNode.gain.value = 0.3;
-      
-      // 複数の音源を組み合わせてきらびやかな効果音
-      const oscillators = [];
-      
-      try {
-        // キラキラ音①（高音）
-        const osc1 = context.createOscillator();
-        osc1.type = 'sine';
-        osc1.frequency.value = 880; // A5
-        osc1.connect(gainNode);
-        
-        // キラキラ音②（さらに高音）
-        const osc2 = context.createOscillator();
-        osc2.type = 'triangle';
-        osc2.frequency.value = 1174.66; // D6
-        osc2.connect(gainNode);
-        
-        // 音量エンベロープ
-        gainNode.gain.setValueAtTime(0, context.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.3, context.currentTime + 0.1);
-        gainNode.gain.linearRampToValueAtTime(0.2, context.currentTime + 1.0);
-        gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 3.0);
-        
-        // 開始
-        osc1.start(context.currentTime);
-        osc2.start(context.currentTime + 0.1);
-        
-        // 終了
-        osc1.stop(context.currentTime + 3.0);
-        osc2.stop(context.currentTime + 3.0);
-        
-        oscillators.push(osc1, osc2);
-        
-        // 別の音（滑らかな下降音）
-        setTimeout(() => {
-          try {
-            const osc3 = context.createOscillator();
-            osc3.type = 'sine';
-            osc3.frequency.setValueAtTime(1500, context.currentTime);
-            osc3.frequency.exponentialRampToValueAtTime(500, context.currentTime + 2.0);
-            
-            const gain3 = context.createGain();
-            gain3.gain.setValueAtTime(0, context.currentTime);
-            gain3.gain.linearRampToValueAtTime(0.2, context.currentTime + 0.1);
-            gain3.gain.linearRampToValueAtTime(0, context.currentTime + 2.0);
-            
-            osc3.connect(gain3).connect(context.destination);
-            osc3.start();
-            osc3.stop(context.currentTime + 2.0);
-            
-            oscillators.push(osc3);
-          } catch (e) {
-            console.error('Error playing second welcome sound:', e);
-          }
-        }, 500);
-      } catch (e) {
-        console.error('Error playing welcome sound:', e);
-      }
-    }
-
-    // -------------------------------
-    // グリップ操作によるボード移動
-    // -------------------------------
-    function onSqueezeStart(event) {
-      const controllerIndex = controllers.indexOf(event.target);
-      isGripping[controllerIndex] = true;
-      controllers[controllerIndex].getWorldPosition(controllerInitialPositions[controllerIndex]);
-      if (board) {
-        board.getWorldPosition(boardInitialPosition);
-      }
-    }
-    
-    function onSqueezeEnd(event) {
-      const controllerIndex = controllers.indexOf(event.target);
-      isGripping[controllerIndex] = false;
-    }
-
-    // -------------------------------
-    // ゲーム初期化
-    // -------------------------------
-    function initializeGame() {
-      // 既存の花火をクリア
-      if (window.fireworksInterval) {
-        clearInterval(window.fireworksInterval);
-        window.fireworksInterval = null;
-      }
-      
-      // 花火の音を停止
-      if (window.fireworkSoundTimeout) {
-        clearTimeout(window.fireworkSoundTimeout);
-        window.fireworkSoundTimeout = null;
-      }
-      
-      // 花火フラグをオフに
-      window.fireworksActive = false;
-      
-      // 残りの花火エフェクトをシーンから削除
-      for (let i = fireworks.length - 1; i >= 0; i--) {
-        scene.remove(fireworks[i]);
-      }
-      fireworks = [];
-      
-      // 難易度選択メニューを削除
-      if (difficultyMenu) {
-        scene.remove(difficultyMenu);
-        difficultyMenu = null;
-      }
-      
-      // ゲーム結果メニューがあれば削除
-      if (gameResultMenu) {
-        scene.remove(gameResultMenu);
-        gameResultMenu = null;
-      }
-      
-      // 既存のボードを削除
-      if (board) {
-        scene.remove(board);
-        pieces = [];
-      }
-      
-      // 盤面を作成
-      board = createBoard();
-      board.position.set(0, 0.7, -0.7); // 高さを0.9から0.7に下げる
-      
-      // 盤面の全要素を透明に設定
-      board.traverse(child => {
-        if (child.material && child.material.transparent !== undefined) {
-          child.material.transparent = true;
-          child.material.opacity = 0;
-        }
-      });
-      
-      // フェードイン用のユーザーデータを追加
-      board.userData = {
-        fadeIn: true,
-        fadeProgress: 0,
-        fadeSpeed: 0.008, // フェードイン速度を遅く
-        initialY: 1.2,    // 開始位置（上から）
-        targetY: 0.7,     // 目標位置
-        rotationProgress: 0, // 回転アニメーション用
-        glowIntensity: 0,   // 光るエフェクト用
-        glowDirection: 1    // 光の強さの変化方向
-      };
-      
-      // 初期位置を上に設定
-      board.position.y = board.userData.initialY;
-      
-      scene.add(board);
-      
-      // 盤のベースメッシュを取得
-      boardBase = board.getObjectByName('boardBase');
-      
-      // ステータス表示を盤の上に配置
-      statusDisplay = createStatusDisplay();
-      statusDisplay.position.set(0, 0.3, -0.2); // 高さを上げ、手前に出す
-      statusDisplay.rotation.x = 0.2; // 少し傾けて見やすく
-      board.add(statusDisplay);
-      
-      // カーソル作成
-      boardCursor = createBoardCursor();
-      board.add(boardCursor);
-      boardCursor.visible = false;
-      
-      // 持ち駒ケースを初期化
-      initPieceCases();
-      
-      // 駒の配置（初期化時は直接配置）
-      updatePieces();
-      
-      // ゲーム状態の初期化
-      gameStarted = true;
-      flippingPieces = []; // アニメーション中の駒をクリア
-      
-      // 交互に先手後手を入れ替え（最初のゲームはプレイヤー先行）
-      if (playerWins + cpuWins + draws === 0) {
-        isPlayerTurn = true;
-        currentPlayer = 1;
-        updateGameMessage('ゲーム開始: プレイヤー（黒）の番です');
-        // 最初のプレイヤーの有効手マーカーを遅延表示
-        setTimeout(() => {
-          showValidMoves(1);
-        }, 500);
-      } else {
-        // 2戦目以降は勝敗に応じて先手後手を変える（勝った方が後手）
-        if (gameResultMenu && gameResultMenu.userData && gameResultMenu.userData.playerWon) {
-          // プレイヤーが勝っていた場合はCPU先行
-          isPlayerTurn = false;
-          currentPlayer = -1;
-          updateGameMessage('ゲーム開始: CPU（白）の番です');
-          setTimeout(makeCPUMove, 300);
-        } else {
-          // CPUが勝っていた場合またはドローの場合はプレイヤー先行
-          isPlayerTurn = true;
-          currentPlayer = 1;
-          updateGameMessage('ゲーム開始: プレイヤー（黒）の番です');
-          // プレイヤーの有効手マーカーを遅延表示
-          setTimeout(() => {
-            showValidMoves(1);
-          }, 500);
-        }
-      }
-      
-      moveCount = 0;
-      updateStatus();
-      
-      // 開始効果音
-      playSound('start');
-    }
-
-    // -------------------------------
-    // パーティクルシステム
-    // -------------------------------
-    function createParticleSystem() {
-      const particleCount = 20; // パーティクル数を減らす
-      
-      // ジオメトリの作成
-      const particleGeometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(particleCount * 3);
-      const colors = new Float32Array(particleCount * 3);
-      const sizes = new Float32Array(particleCount);
-      
-      // パーティクルの初期設定
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        
-        // より自然な初期位置（円形に広がる）
-        const angle = (i / particleCount) * Math.PI * 2;
-        const radius = 0.02;
-        positions[i3] = Math.cos(angle) * radius;
-        positions[i3 + 1] = 0.02; // 少し上から開始
-        positions[i3 + 2] = Math.sin(angle) * radius;
-        
-        // より自然な色（白から透明へ）
-        colors[i3] = 1;
-        colors[i3 + 1] = 1;
-        colors[i3 + 2] = 1;
-        
-        // サイズ
-        sizes[i] = Math.random() * 0.005 + 0.003;
-      }
-      
-      particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-      
-      // より自然なパーティクル用のマテリアル
-      const particleMaterial = new THREE.PointsMaterial({
-        size: 0.005,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.8,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-      });
-      
-      const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-      particleSystem.userData = {
-        velocities: Array(particleCount).fill().map(() => ({
-          x: (Math.random() - 0.5) * 0.01,
-          y: Math.random() * 0.01 + 0.005,
-          z: (Math.random() - 0.5) * 0.01
-        })),
-        lifetime: 0,
-        maxLifetime: 60
-      };
-      
-      return particleSystem;
-    }
-    
-    // 輪っかパーティクルシステムの作成
-    function createRingParticleSystem() {
-      const particleCount = 30; // 輪の粒子数
-      
-      // ジオメトリの作成
-      const particleGeometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(particleCount * 3);
-      const colors = new Float32Array(particleCount * 3);
-      const sizes = new Float32Array(particleCount);
-      
-      // 初期半径
-      const initialRadius = 0.01;
-      
-      // パーティクルの初期設定
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        
-        // 輪っか状に配置
-        const angle = (i / particleCount) * Math.PI * 2;
-        positions[i3] = Math.cos(angle) * initialRadius;     // X座標
-        positions[i3 + 1] = 0.01;                           // Y座標 (駒の上に表示)
-        positions[i3 + 2] = Math.sin(angle) * initialRadius; // Z座標
-        
-        // 色 (白〜黄色系で輝く)
-        colors[i3] = 1.0;                   // 赤 (R)
-        colors[i3 + 1] = 0.9 + Math.random() * 0.1; // 緑 (G)
-        colors[i3 + 2] = 0.7 + Math.random() * 0.3; // 青 (B)
-        
-        // サイズ (小さめで均一)
-        sizes[i] = 0.003 + Math.random() * 0.002;
-      }
-      
-      particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-      
-      // 輝くパーティクル用のマテリアル
-      const particleMaterial = new THREE.PointsMaterial({
-        size: 0.004,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.9,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-      });
-      
-      const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-      particleSystem.userData = {
-        initialRadius: initialRadius,
-        expandSpeed: 0.002,  // 拡大速度
-        rotateSpeed: 0.03,   // 回転速度
-        lifetime: 0,
-        maxLifetime: 45      // ライフタイム
-      };
-      
-      return particleSystem;
-    }
-    
-    // パーティクルシステムの更新
-    function updateParticles(delta) {
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const particle = particles[i];
-        
-        // ライフタイム更新
-        particle.userData.lifetime += delta;
-        
-        if (particle.userData.lifetime > particle.userData.maxLifetime) {
-          // ライフタイム終了で削除
-          board.remove(particle);
-          particles.splice(i, 1);
-          continue;
-        }
-        
-        // 不透明度を徐々に下げる
-        const lifeRatio = particle.userData.lifetime / particle.userData.maxLifetime;
-        particle.material.opacity = 1 - lifeRatio;
-        
-        // 輪っかパーティクルの特殊更新
-        if (particle.userData.initialRadius !== undefined) {
-          // 輪っかの半径を徐々に大きくする
-          const positions = particle.geometry.attributes.position.array;
-          const particleCount = positions.length / 3;
-          const currentRadius = particle.userData.initialRadius + (lifeRatio * 0.05);
-          
-          // 回転角度を更新
-          const rotateAngle = particle.userData.lifetime * particle.userData.rotateSpeed;
-          
-          for (let j = 0; j < particleCount; j++) {
-            const j3 = j * 3;
-            const originalAngle = (j / particleCount) * Math.PI * 2;
-            const newAngle = originalAngle + rotateAngle;
-            
-            // 新しい位置を計算
-            positions[j3] = Math.cos(newAngle) * currentRadius;
-            positions[j3 + 1] = 0.01 + lifeRatio * 0.01; // 少しずつ上昇
-            positions[j3 + 2] = Math.sin(newAngle) * currentRadius;
-          }
-          
-          particle.geometry.attributes.position.needsUpdate = true;
-        } else {
-          // 従来のパーティクル更新処理
-          const positions = particle.geometry.attributes.position.array;
-          const velocities = particle.userData.velocities;
-          
-          for (let j = 0; j < positions.length / 3; j++) {
-            const j3 = j * 3;
-            
-            // 位置を速度に基づいて更新
-            positions[j3] += velocities[j].x;
-            positions[j3 + 1] += velocities[j].y;
-            positions[j3 + 2] += velocities[j].z;
-            
-            // 重力効果
-            velocities[j].y -= 0.0003;
-          }
-          
-          particle.geometry.attributes.position.needsUpdate = true;
-        }
-      }
-      
-      // 花火の更新
-      for (let i = fireworks.length - 1; i >= 0; i--) {
-        const firework = fireworks[i];
-        
-        // ライフタイム更新
-        firework.userData.lifetime += delta;
-        
-        if (firework.userData.lifetime > firework.userData.maxLifetime) {
-          // ライフタイム終了で削除
-          scene.remove(firework);
-          fireworks.splice(i, 1);
-          continue;
-        }
-        
-        // 花火のパーティクル更新
-        const positions = firework.geometry.attributes.position.array;
-        const velocities = firework.userData.velocities;
-        const colors = firework.geometry.attributes.color.array;
-        
-        for (let j = 0; j < positions.length / 3; j++) {
-          const j3 = j * 3;
-          const velocity = velocities[j];
-          
-          // 個別パーティクルのライフタイム更新
-          velocity.lifetime += delta;
-          const particleProgress = velocity.lifetime / velocity.maxLifetime;
-          
-          if (particleProgress < 1) {
-            // 位置を速度に基づいて更新
-            positions[j3] += velocity.x;
-            positions[j3 + 1] += velocity.y;
-            positions[j3 + 2] += velocity.z;
-            
-            // 重力効果
-            velocity.y -= velocity.gravity;
-            
-            // 速度の減衰
-            velocity.x *= (1 - velocity.decay * delta * 0.1);
-            velocity.y *= (1 - velocity.decay * delta * 0.1);
-            velocity.z *= (1 - velocity.decay * delta * 0.1);
-            
-            // 色の輝度を徐々に下げる（パーティクルごとに異なる減衰）
-            const fadeRatio = particleProgress;
-            const colorFade = 1 - fadeRatio * fadeRatio; // 二次関数で減衰（後半で急速に暗くなる）
-            
-            colors[j3] *= colorFade;
-            colors[j3 + 1] *= colorFade;
-            colors[j3 + 2] *= colorFade;
-          } else {
-            // パーティクルの寿命が尽きたら透明に
-            colors[j3] = 0;
-            colors[j3 + 1] = 0;
-            colors[j3 + 2] = 0;
-          }
-        }
-        
-        firework.geometry.attributes.position.needsUpdate = true;
-        firework.geometry.attributes.color.needsUpdate = true;
-        
-        // 全体の進行状況
-        const lifeRatio = firework.userData.lifetime / firework.userData.maxLifetime;
-        
-        // サイズを徐々に小さく（パターン別の効果）
-        if (firework.userData.patternType === 0) {
-          // 球状爆発は通常の縮小
-          firework.material.size = firework.userData.initialSize * (1 - lifeRatio * 0.5);
-        } else if (firework.userData.patternType === 1) {
-          // リング状爆発はゆっくり縮小
-          firework.material.size = firework.userData.initialSize * (1 - lifeRatio * 0.3);
-        } else {
-          // 星型爆発は最後まで大きめをキープ
-          firework.material.size = firework.userData.initialSize * (1 - lifeRatio * 0.4);
-        }
-        
-        // 不透明度も調整
-        firework.material.opacity = 1 - lifeRatio * lifeRatio; // 二次関数で減衰
-      }
-    }
-    
-    // 駒配置時のパーティクル効果
-    function createPlacementEffect(x, z) {
-      // 輪っかパーティクルエフェクトを作成
-      const ringParticle = createRingParticleSystem();
-      
-      // 駒の位置に配置 (boardXとboardZの計算を合わせる)
-      const boardX = -0.25 + 0.03125 + (x * 0.0625);
-      const boardZ = -0.25 + 0.03125 + (z * 0.0625);
-      
-      // 駒の上に配置
-      ringParticle.position.set(boardX, 0.04, boardZ);
-      
-      board.add(ringParticle);
-      particles.push(ringParticle);
-      
-      // 星型パーティクルエフェクトも追加（約30%の確率で）
-      if (Math.random() < 0.3) {
-        const starParticle = createStarRingParticleSystem();
-        starParticle.position.set(boardX, 0.04, boardZ);
-        board.add(starParticle);
-        particles.push(starParticle);
-      }
-    }
-    
-    // 星型の輪っかパーティクルシステムの作成
-    function createStarRingParticleSystem() {
-      const particleCount = 20; // 星の数（輪の粒子数より少なめ）
-      
-      // ジオメトリの作成
-      const particleGeometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(particleCount * 3);
-      const colors = new Float32Array(particleCount * 3);
-      const sizes = new Float32Array(particleCount);
-      
-      // 初期半径
-      const initialRadius = 0.015;
-      
-      // パーティクルの初期設定
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        
-        // 輪っか状に配置
-        const angle = (i / particleCount) * Math.PI * 2;
-        positions[i3] = Math.cos(angle) * initialRadius;     // X座標
-        positions[i3 + 1] = 0.01;                           // Y座標 (駒の上に表示)
-        positions[i3 + 2] = Math.sin(angle) * initialRadius; // Z座標
-        
-        // 色 (金色系で輝く)
-        colors[i3] = 1.0;                   // 赤 (R)
-        colors[i3 + 1] = 0.8 + Math.random() * 0.2; // 緑 (G)
-        colors[i3 + 2] = 0.4 + Math.random() * 0.3; // 青 (B)
-        
-        // サイズ (小さめで均一)
-        sizes[i] = 0.004 + Math.random() * 0.003;
-      }
-      
-      particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-      
-      // 星型パーティクル用マテリアル
-      const particleMaterial = new THREE.PointsMaterial({
-        size: 0.005,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.9,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-        map: createStarParticleTexture()
-      });
-      
-      const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-      particleSystem.userData = {
-        initialRadius: initialRadius,
-        expandSpeed: 0.003,  // 拡大速度（通常より速め）
-        rotateSpeed: -0.04,   // 回転速度（逆回転）
-        lifetime: 0,
-        maxLifetime: 40      // ライフタイム
-      };
-      
-      return particleSystem;
-    }
-    
-    // 勝利時の花火効果
-    function createFireworks() {
-      // グローバル変数でフラグを設定
-      window.fireworksActive = true;
-      
-      // 最初に5発の花火を打ち上げる
-      for (let i = 0; i < 5; i++) {
-        setTimeout(() => {
-          launchFirework();
-        }, i * 300); // 時間差で発射
-      }
-      
-      // 継続的に花火を打ち上げる（再スタートされるまで）
-      window.fireworksInterval = setInterval(() => {
-        // 1～3発をランダムに打ち上げる
-        const count = Math.floor(Math.random() * 3) + 1;
-        for (let i = 0; i < count; i++) {
-          setTimeout(() => {
-            if (window.fireworksActive) {
-              launchFirework();
-            }
-          }, i * 200 + Math.random() * 500);
-        }
-      }, 2000); // 2秒ごとに新しい花火グループを打ち上げ
-      
-      // 効果音
-      playSound('win');
-      
-      // 花火の音も再生（一度だけ）
-      playFireworkSound();
-    }
-    
-    // 花火一発の作成
-    function launchFirework() {
-      const particleCount = 200; // 150から200に増やして密度アップ
-      const fireworkGeometry = new THREE.BufferGeometry();
-      const positions = new Float32Array(particleCount * 3);
-      const colors = new Float32Array(particleCount * 3);
-      const sizes = new Float32Array(particleCount);
-      const velocities = [];
-      
-      // 花火の色をランダムに決定（より鮮やかな色合いに）
-      const hue = Math.random();
-      const fireworkColor = new THREE.Color().setHSL(
-        hue,
-        0.8 + Math.random() * 0.2, // 彩度を高く
-        0.6 + Math.random() * 0.2  // 明度も高め
-      );
-      
-      // 補色も用意（２色の花火に）
-      const complementaryColor = new THREE.Color().setHSL(
-        (hue + 0.5) % 1.0,
-        0.8 + Math.random() * 0.2,
-        0.6 + Math.random() * 0.2
-      );
-      
-      // 発射位置をランダムに
-      const startX = (Math.random() - 0.5) * 2;
-      const startY = 1.5;
-      const startZ = -1 + (Math.random() - 0.5) * 0.5;
-      
-      // 爆発パターンのバリエーション（3種類）
-      const patternType = Math.floor(Math.random() * 3);
-      
-      // パーティクルサイズの設定（より小さくリアルに）
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        
-        // 中心点から
-        positions[i3] = startX;
-        positions[i3 + 1] = startY;
-        positions[i3 + 2] = startZ;
-        
-        // 花火の色（2色のグラデーション）
-        if (Math.random() > 0.5) {
-          colors[i3] = fireworkColor.r;
-          colors[i3 + 1] = fireworkColor.g;
-          colors[i3 + 2] = fireworkColor.b;
-        } else {
-          colors[i3] = complementaryColor.r;
-          colors[i3 + 1] = complementaryColor.g;
-          colors[i3 + 2] = complementaryColor.b;
-        }
-        
-        // サイズをより小さく設定
-        sizes[i] = Math.random() * 0.015 + 0.005; // 0.05から大幅に縮小
-        
-        // 爆発パターンに応じた速度ベクトル
-        let speed, angle1, angle2, vx, vy, vz;
-        
-        switch (patternType) {
-          case 0: // 球状爆発
-            speed = Math.random() * 0.02 + 0.01;
-            angle1 = Math.random() * Math.PI * 2;
-            angle2 = Math.random() * Math.PI;
-            
-            vx = Math.sin(angle2) * Math.cos(angle1) * speed;
-            vy = Math.cos(angle2) * speed;
-            vz = Math.sin(angle2) * Math.sin(angle1) * speed;
-            break;
-            
-          case 1: // リング状爆発
-            speed = Math.random() * 0.01 + 0.015;
-            angle1 = Math.random() * Math.PI * 2;
-            // 水平方向に近い角度に制限
-            angle2 = (Math.PI / 2) + (Math.random() - 0.5) * Math.PI * 0.2;
-            
-            vx = Math.sin(angle2) * Math.cos(angle1) * speed;
-            vy = Math.cos(angle2) * speed * 0.5; // Y方向の速度を抑制
-            vz = Math.sin(angle2) * Math.sin(angle1) * speed;
-            break;
-            
-          case 2: // 多重星型爆発
-            speed = Math.random() * 0.02 + 0.01;
-            // 特定の角度に集中させる
-            const segments = 8; // 星の尖った部分の数
-            const segmentIndex = Math.floor(Math.random() * segments);
-            angle1 = (segmentIndex / segments) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
-            angle2 = Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.5;
-            
-            vx = Math.sin(angle2) * Math.cos(angle1) * speed;
-            vy = Math.cos(angle2) * speed;
-            vz = Math.sin(angle2) * Math.sin(angle1) * speed;
-            break;
-        }
-        
-        // 速度にわずかなランダム変動を加える
-        vx += (Math.random() - 0.5) * 0.005;
-        vy += (Math.random() - 0.5) * 0.005;
-        vz += (Math.random() - 0.5) * 0.005;
-        
-        velocities.push({ 
-          x: vx, 
-          y: vy, 
-          z: vz,
-          // 重力効果を少し強く
-          gravity: Math.random() * 0.0004 + 0.0002, 
-          // 減衰も調整
-          decay: Math.random() * 0.01 + 0.005,
-          // 各パーティクルに個別の寿命を設定
-          lifetime: 0,
-          maxLifetime: 70 + Math.random() * 30
-        });
-      }
-      
-      fireworkGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      fireworkGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      fireworkGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-      
-      // 輝く粒子のマテリアル
-      const fireworkMaterial = new THREE.PointsMaterial({
-        size: 0.02, // デフォルトサイズも小さく
-        vertexColors: true,
-        transparent: true,
-        opacity: 1,
-        blending: THREE.AdditiveBlending,
-        sizeAttenuation: true,
-      });
-      
-      const firework = new THREE.Points(fireworkGeometry, fireworkMaterial);
-      firework.userData = {
-        velocities: velocities,
-        lifetime: 0,
-        maxLifetime: 100,
-        initialSize: 0.02, // 初期サイズも小さく
-        patternType: patternType, // パターンタイプを保存
-        color: fireworkColor // 色情報も保存
-      };
-      
-      scene.add(firework);
-      fireworks.push(firework);
-      
-      // 花火の音再生
-      playRandomFireworkSound();
-      
-      // 星型パーティクルを追加（約30%の確率）
-      if (Math.random() < 0.3) {
-        const starCount = Math.floor(particleCount / 3);
-        const starGeometry = new THREE.BufferGeometry();
-        const starPositions = new Float32Array(starCount * 3);
-        const starColors = new Float32Array(starCount * 3);
-        const starSizes = new Float32Array(starCount);
-        const starVelocities = [];
-        
-        // 星型パーティクルにも同じような配置と速度を設定
-        for (let i = 0; i < starCount; i++) {
-          const i3 = i * 3;
-          
-          starPositions[i3] = startX;
-          starPositions[i3 + 1] = startY;
-          starPositions[i3 + 2] = startZ;
-          
-          if (Math.random() > 0.5) {
-            starColors[i3] = fireworkColor.r;
-            starColors[i3 + 1] = fireworkColor.g;
-            starColors[i3 + 2] = fireworkColor.b;
-          } else {
-            starColors[i3] = complementaryColor.r;
-            starColors[i3 + 1] = complementaryColor.g;
-            starColors[i3 + 2] = complementaryColor.b;
-          }
-          
-          // 星は少し大きめに
-          starSizes[i] = Math.random() * 0.02 + 0.01;
-          
-          let speed, angle1, angle2, vx, vy, vz;
-          
-          // 星も同じパターンで飛ばす
-          switch (patternType) {
-            case 0:
-              speed = Math.random() * 0.02 + 0.01;
-              angle1 = Math.random() * Math.PI * 2;
-              angle2 = Math.random() * Math.PI;
-              
-              vx = Math.sin(angle2) * Math.cos(angle1) * speed;
-              vy = Math.cos(angle2) * speed;
-              vz = Math.sin(angle2) * Math.sin(angle1) * speed;
-              break;
-              
-            case 1:
-              speed = Math.random() * 0.01 + 0.015;
-              angle1 = Math.random() * Math.PI * 2;
-              angle2 = (Math.PI / 2) + (Math.random() - 0.5) * Math.PI * 0.2;
-              
-              vx = Math.sin(angle2) * Math.cos(angle1) * speed;
-              vy = Math.cos(angle2) * speed * 0.5;
-              vz = Math.sin(angle2) * Math.sin(angle1) * speed;
-              break;
-              
-            case 2:
-              speed = Math.random() * 0.02 + 0.01;
-              const segments = 8;
-              const segmentIndex = Math.floor(Math.random() * segments);
-              angle1 = (segmentIndex / segments) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
-              angle2 = Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.5;
-              
-              vx = Math.sin(angle2) * Math.cos(angle1) * speed;
-              vy = Math.cos(angle2) * speed;
-              vz = Math.sin(angle2) * Math.sin(angle1) * speed;
-              break;
-          }
-          
-          vx += (Math.random() - 0.5) * 0.005;
-          vy += (Math.random() - 0.5) * 0.005;
-          vz += (Math.random() - 0.5) * 0.005;
-          
-          starVelocities.push({ 
-            x: vx, 
-            y: vy, 
-            z: vz,
-            gravity: Math.random() * 0.0004 + 0.0002,
-            decay: Math.random() * 0.01 + 0.005,
-            lifetime: 0,
-            maxLifetime: 60 + Math.random() * 20 // 星は少し短めの寿命
           });
         }
-        
-        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-        starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
-        starGeometry.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
-        
-        // 星型パーティクル用マテリアル
-        const starMaterial = new THREE.PointsMaterial({
-          size: 0.025,
-          vertexColors: true,
-          transparent: true,
-          opacity: 1,
-          blending: THREE.AdditiveBlending,
-          sizeAttenuation: true,
-          map: createStarParticleTexture()
-        });
-        
-        const starFirework = new THREE.Points(starGeometry, starMaterial);
-        starFirework.userData = {
-          velocities: starVelocities,
-          lifetime: 0,
-          maxLifetime: 80,
-          initialSize: 0.025,
-          isStar: true,
-          patternType: patternType
-        };
-        
-        scene.add(starFirework);
-        fireworks.push(starFirework);
       }
+      
+      // 盤面のフェードインアニメーション更新
+      if (board && board.userData && board.userData.fadeIn) {
+        const fadeProgress = board.userData.fadeProgress;
+        const fadeSpeed = board.userData.fadeSpeed;
+        const userData = board.userData;
+        
+        if (fadeProgress < 1) {
+          // フェードイン進行中
+          board.userData.fadeProgress = Math.min(fadeProgress + fadeSpeed, 1);
+          const progress = easeOutCubic(board.userData.fadeProgress);
+          
+          // 透明度の更新
+          board.traverse(child => {
+            if (child.material && child.material.transparent) {
+              if (child.material.opacity !== undefined) {
+                child.material.opacity = progress;
+              }
+            }
+          });
+          
+          // 位置の更新（上から降りてくる）
+          const currentY = userData.initialY + (userData.targetY - userData.initialY) * progress;
+          board.position.y = currentY;
+          
+          // 回転アニメーション
+          userData.rotationProgress += fadeSpeed * 2;
+          const rotationAmount = (1 - progress) * Math.PI * 0.1; // 最大10度まで傾く
+          board.rotation.x = Math.sin(userData.rotationProgress) * rotationAmount;
+          
+          // 光るエフェクト
+          userData.glowIntensity += 0.05 * userData.glowDirection;
+          if (userData.glowIntensity >= 1) {
+            userData.glowDirection = -1;
+          } else if (userData.glowIntensity <= 0) {
+            userData.glowDirection = 1;
+          }
+          
+          // 光るエフェクトの適用
+          board.traverse(child => {
+            if (child.material) {
+              if (child.material.emissive) {
+                const baseColor = child.material.color;
+                child.material.emissive.setRGB(
+                  baseColor.r * userData.glowIntensity * 0.3,
+                  baseColor.g * userData.glowIntensity * 0.3,
+                  baseColor.b * userData.glowIntensity * 0.3
+                );
+              }
+            }
+          });
+        } else {
+          // アニメーション完了時の処理
+          board.rotation.x = 0; // 回転をリセット
+          board.position.y = userData.targetY; // 位置を確実に目標位置に
+          
+          // 光るエフェクトをリセット
+          board.traverse(child => {
+            if (child.material && child.material.emissive) {
+              child.material.emissive.setRGB(0, 0, 0);
+            }
+          });
+          
+          board.userData.fadeIn = false;
+        }
+      }
+      
+      // パーティクルシステムの更新
+      updateParticles(deltaTime);
+      
+      // デスクトップモード用のカーソル処理
+      updateDesktopCursor();
+      
+      // 描画
+      renderer.render(scene, camera);
     }
 
     // -------------------------------
-    // Three.js 初期化
+    // デスクトップモード用のマウス操作設定
     // -------------------------------
-    function init() {
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    let raycaster = new THREE.Raycaster();
+    let mouse = new THREE.Vector2();
+    let isMouseDown = false;
+
+    function setupDesktopControls() {
+      const canvas = document.getElementById('canvas');
       
-      renderer = new THREE.WebGLRenderer({
-        canvas: document.getElementById('canvas'),
-        antialias: true,
-        alpha: true
+      // マウス移動のイベントリスナー
+      canvas.addEventListener('mousemove', function(event) {
+        // マウス位置を正規化 (-1 から 1 の範囲)
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
       });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
       
-      // シャドウマップを有効化
-      renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap; // ソフトシャドウを使用
+      // クリックのイベントリスナー
+      canvas.addEventListener('mousedown', function(event) {
+        isMouseDown = true;
+        handleDesktopClick();
+      });
       
-      // 照明設定 - 環境光の強度を元に戻す
-      // 環境光
-      scene.add(new THREE.AmbientLight(0x404060, 0.5)); // 0.6から0.5に戻す
+      canvas.addEventListener('mouseup', function() {
+        isMouseDown = false;
+      });
       
-      // メインの平行光源（上から）
-      const mainLight = new THREE.DirectionalLight(0xffffff, 0.9); // 0.9はそのまま
-      mainLight.position.set(0, 10, 5);
-      mainLight.castShadow = true;
-      // シャドウマップの設定を調整（高品質な影用）
-      mainLight.shadow.mapSize.width = 512;
-      mainLight.shadow.mapSize.height = 512;
-      mainLight.shadow.camera.near = 1;
-      mainLight.shadow.camera.far = 30;
-      // 影のエリアを制限してシャープさを向上
-      mainLight.shadow.camera.left = -2;
-      mainLight.shadow.camera.right = 2;
-      mainLight.shadow.camera.top = 2;
-      mainLight.shadow.camera.bottom = -2;
-      mainLight.shadow.bias = -0.0005; // 影のアクネ（ちらつき）を軽減
-      scene.add(mainLight);
-      
-      // 補助光（側面から柔らかい光）
-      const fillLight1 = new THREE.DirectionalLight(0x8090ff, 0.4);
-      fillLight1.position.set(-5, 3, 5);
-      // 補助光も影を落とす（より柔らかい影を追加）
-      fillLight1.castShadow = false;
-      fillLight1.shadow.mapSize.width = 1024;
-      fillLight1.shadow.mapSize.height = 1024;
-      fillLight1.shadow.camera.near = 0.5;
-      fillLight1.shadow.camera.far = 30;
-      fillLight1.shadow.camera.left = -1;
-      fillLight1.shadow.camera.right = 1;
-      fillLight1.shadow.camera.top = 1;
-      fillLight1.shadow.camera.bottom = -1;
-      fillLight1.shadow.bias = -0.0003;
-      scene.add(fillLight1);
-      
-      // バックライト（裏側から）
-      const backLight = new THREE.DirectionalLight(0x4060a0, 0.4); // 0.4はそのまま
-      backLight.position.set(5, 7, -10);
-      scene.add(backLight);
-      
-      // 追加の光源（右側面から）- 盤面の光沢を強調
-      const rightLight = new THREE.DirectionalLight(0xffffcc, 0.3); // 暖かい色の光
-      rightLight.position.set(8, 4, 2);
-      scene.add(rightLight);
-      
-      // 追加の光源（左側面から）- 盤面の光沢をさらに強調
-      const leftLight = new THREE.DirectionalLight(0xccffff, 0.3); // 涼しい色の光
-      leftLight.position.set(-8, 4, 2);
-      scene.add(leftLight);
-      
-      window.addEventListener('resize', () => {
+      // ウィンドウリサイズ時の対応
+      window.addEventListener('resize', function() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
-      
-      document.getElementById('startButton').addEventListener('click', startXRSession);
-      
-      // ページ読み込み時にVR機器のサポート状況をチェック
-      checkVRSupport();
     }
 
     // -------------------------------
-    // リッチなオセロ盤作成 - ボードベースのマテリアル設定を元に戻す
+    // デスクトップモード用のマウスカーソル処理
     // -------------------------------
-    function createBoard() {
-      const boardGroup = new THREE.Group();
+    function updateDesktopCursor() {
+      // プレイヤーターンでない場合は処理しない
+      if (!gameStarted || !isPlayerTurn || !board || !boardBase) return;
       
-      // 高級木材風のテクスチャ作成
-      function createWoodTexture(color1, color2, grainSize = 10) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
+      // レイキャストで交差を確認
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(boardBase);
+      
+      let cursorVisible = false;
+      
+      if (intersects.length > 0) {
+        const intersect = intersects[0];
+        const localPoint = board.worldToLocal(intersect.point.clone());
         
-        // 背景色
-        ctx.fillStyle = color1;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        let col = Math.floor((localPoint.x + 0.25) / 0.0625);
+        let row = Math.floor((localPoint.z + 0.25) / 0.0625);
         
-        // 木目パターン
-        ctx.fillStyle = color2;
-        
-        for (let i = 0; i < canvas.height; i += grainSize) {
-          const lineWidth = Math.random() * 3 + 1;
-          const yPos = i + Math.random() * grainSize;
-          ctx.globalAlpha = Math.random() * 0.4 + 0.1;
-          ctx.fillRect(0, yPos, canvas.width, lineWidth);
+        if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+          const cellCenterX = -0.25 + 0.03125 + (col * 0.0625);
+          const cellCenterZ = -0.25 + 0.03125 + (row * 0.0625);
+          
+          // カーソル表示を更新
+          if (boardCursor) {
+            boardCursor.visible = true;
+            cursorVisible = true;
+            boardCursor.position.set(cellCenterX, 0.032, cellCenterZ);
+            
+            // カーソル色：有効なら緑、無効なら赤
+            const isValid = isValidMove(row, col, 1);
+            const cursorColor = isValid ? 0x00ff00 : 0xff0000;
+            
+            boardCursor.traverse(child => {
+              if (child instanceof THREE.Mesh && child.material.color) {
+                child.material.color.setHex(cursorColor);
+              } else if (child instanceof THREE.LineSegments && child.material.color) {
+                child.material.color.setHex(cursorColor);
+              } else if (child instanceof THREE.Points && child.material.color) {
+                child.material.color.setHex(cursorColor);
+              }
+            });
+          }
         }
-        
-        // テクスチャを反映
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        return texture;
       }
       
-      // マーブル調テクスチャ
-      function createMarbleTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
+      // 盤面上にカーソルがない場合は非表示
+      if (!cursorVisible && boardCursor) {
+        boardCursor.visible = false;
+      }
+    }
+
+    // -------------------------------
+    // デスクトップモード用のクリック処理
+    // -------------------------------
+    function handleDesktopClick() {
+      // プレイヤーターンでない場合は処理しない
+      if (!gameStarted || !isPlayerTurn || !board || !boardBase) return;
+      
+      raycaster.setFromCamera(mouse, camera);
+      
+      // 難易度選択メニューの処理
+      if (!difficultySelected && difficultyMenu) {
+        // メニューの子要素を検索
+        const menuIntersects = raycaster.intersectObject(difficultyMenu, true);
         
-        // 背景
-        ctx.fillStyle = '#f5f5f5';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 大理石の模様
-        for (let i = 0; i < 20; i++) {
-          const gradient = ctx.createRadialGradient(
-            Math.random() * canvas.width,
-            Math.random() * canvas.height,
-            0,
-            Math.random() * canvas.width,
-            Math.random() * canvas.height,
-            Math.random() * 100 + 50
-          );
-          
-          gradient.addColorStop(0, `rgba(200, 200, 200, ${Math.random() * 0.3})`);
-          gradient.addColorStop(1, 'rgba(200, 200, 200, 0)');
-          
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (menuIntersects.length > 0) {
+          // クリックしたボタンを見つける
+          const clickedButton = findButton(menuIntersects[0].object);
+          if (clickedButton) {
+            // 難易度ボタンがクリックされた場合
+            if (clickedButton.userData.type === 'difficultyButton') {
+              highlightButton(clickedButton);
+            }
+            // スタートボタンがクリックされた場合
+            else if (clickedButton.userData.type === 'startButton') {
+              handleStartButtonClick();
+            }
+          }
+          return;
         }
-        
-        // 細かい筋
-        for (let i = 0; i < 10; i++) {
-          ctx.strokeStyle = `rgba(150, 150, 150, ${Math.random() * 0.2 + 0.1})`;
-          ctx.lineWidth = Math.random() * 2 + 0.5;
-          
-          ctx.beginPath();
-          ctx.moveTo(Math.random() * canvas.width, 0);
-          ctx.bezierCurveTo(
-            Math.random() * canvas.width, Math.random() * canvas.height,
-            Math.random() * canvas.width, Math.random() * canvas.height,
-            Math.random() * canvas.width, canvas.height
-          );
-          ctx.stroke();
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
       }
       
-      // 豪華なボードベース（高級木材風）
-      const boardTexture = createWoodTexture('#804000', '#5a2800', 15);
-      const baseMaterial = new THREE.MeshStandardMaterial({ 
-        map: boardTexture,
-        roughness: 0.5, // 0.4から0.5に戻す
-        metalness: 0.2, // 0.25から0.2に戻す
-        bumpMap: boardTexture,
-        bumpScale: 0.02,
-        envMapIntensity: 0.5 // 環境マップの反射強度はそのまま
-      });
+      // ゲーム結果メニューの処理
+      if (gameResultMenu) {
+        const resultIntersects = raycaster.intersectObject(gameResultMenu, true);
+        
+        if (resultIntersects.length > 0) {
+          const clickedButton = findButton(resultIntersects[0].object);
+          if (clickedButton) {
+            if (clickedButton.userData.type === 'difficultyMenuButton') {
+              // 難易度選択に戻るボタン
+              handleDifficultyMenuButtonClick();
+            } else if (clickedButton.userData.type === 'rematchButton') {
+              // 同じ難易度で再戦ボタン
+              handleRematchButtonClick(clickedButton.userData.playerWon);
+            }
+          }
+          return;
+        }
+      }
       
-      // 底面（厚み感を出す）
-      const baseGeometry = new THREE.BoxGeometry(0.6, 0.05, 0.6);
-      const base = new THREE.Mesh(baseGeometry, baseMaterial);
-      base.position.y = -0.02;
-      // 影の設定を追加
-      base.castShadow = true;
-      base.receiveShadow = true;
-      boardGroup.add(base);
+      // 盤面のクリック処理
+      const boardIntersects = raycaster.intersectObject(boardBase);
       
-      // 枠（外周）
-      const frameGeometry = new THREE.BoxGeometry(0.56, 0.03, 0.56);
-      const frameMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x3d2b1f, 
-        roughness: 0.35, // 0.4から0.35に変更して光沢を増す
-        metalness: 0.3,
-        envMapIntensity: 0.4 // 環境マップの反射強度を追加
-      });
-      const frame = new THREE.Mesh(frameGeometry, frameMaterial);
-      frame.position.y = 0.01;
-      // 影の設定を追加
-      frame.castShadow = true;
-      frame.receiveShadow = true;
-      boardGroup.add(frame);
+      if (boardIntersects.length > 0) {
+        const intersect = boardIntersects[0];
+        const localPoint = board.worldToLocal(intersect.point.clone());
+        
+        let col = Math.floor((localPoint.x + 0.25) / 0.0625);
+        let row = Math.floor((localPoint.z + 0.25) / 0.0625);
+        
+        if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+          handlePlacePiece(row, col);
+        }
+      }
+    }
+
+    // -------------------------------
+    // 駒を置く処理（共通処理）
+    // -------------------------------
+    function handlePlacePiece(row, col) {
+      // ゲームが開始されていない、もしくはプレイヤーのターンでない場合は処理しない
+      if (!gameStarted || !isPlayerTurn || isProcessingMove) return;
+      
+      // 有効な手かどうか確認
+      if (isValidMove(row, col, currentPlayer)) {
+        isProcessingMove = true;
+        
+        // 駒を置く音を再生
+        playSound('placePlayer');
+        
+        // 実際に駒を配置
+        placePiece(row, col, currentPlayer);
+        
+        // フリップする駒のアニメーションを開始
+        const flippedPieces = getFlippablePieces(row, col, currentPlayer);
+        for (const [r, c] of flippedPieces) {
+          flipPiece(r, c);
+        }
+        
+        // ターン終了時の処理をスケジュール
+        setTimeout(() => {
+          completePlayerTurn();
+        }, 800);
+      }
+    }
+
+    // -------------------------------
+    // イベントリスナー設定とゲーム初期化
+    // -------------------------------
+    document.addEventListener('DOMContentLoaded', function() {
+      init();
+      
+      document.getElementById('startButton').addEventListener('click', startXRSession);
+      // デスクトップモード用のボタンにイベントリスナーを追加
+      document.getElementById('desktopButton').addEventListener('click', startDesktopMode);
+      
+      // ページ読み込み時にVR機器のサポート状況をチェック
+      checkVRSupport();
+    });
       
       // プレイエリア（緑の部分）- より光沢のあるマテリアルに変更
       const boardGeometry = new THREE.BoxGeometry(0.5, 0.02, 0.5);
@@ -4189,7 +1634,7 @@
           
           if (intersectedObject && intersectedObject.userData) {
             if (intersectedObject.userData.type === 'difficultyMenuButton') {
-              // 難易度選択に戻る
+              // 難易度選択に戻るボタン
               playSound('select');
               scene.remove(gameResultMenu);
               gameResultMenu = null;
@@ -5133,208 +2578,293 @@
       filter.connect(gainNode);
     }
 
-    // VRデバイスの検出
-    function checkVRSupport() {
-      return new Promise((resolve) => {
-        if (navigator.xr) {
-          // VRとARの両方をチェック
-          Promise.all([
-            navigator.xr.isSessionSupported('immersive-vr'),
-            navigator.xr.isSessionSupported('immersive-ar')
-          ]).then(([vrSupported, arSupported]) => {
-            resolve({
-              vr: vrSupported,
-              ar: arSupported
-            });
-          });
-        } else {
-          resolve({
-            vr: false,
-            ar: false
-          });
+    // ゲームの状態をリセットして、新しいゲームを開始する
+    function resetAndStartNewGame() {
+      if (gameResultMenu) {
+        scene.remove(gameResultMenu);
+        gameResultMenu = null;
+      }
+      
+      if (confetti) {
+        scene.remove(confetti);
+        confetti = null;
+      }
+      
+      // 盤面をリセット
+      resetBoard();
+      initializeGame();
+      
+      // 難易度選択メニューでは、選択した難易度に応じて盤を設置
+      if (!difficultySelected) {
+        difficultySelected = true;
+        
+        if (difficultyMenu) {
+          scene.remove(difficultyMenu);
+          difficultyMenu = null;
         }
+        
+        // 効果音
+        playSound('select');
+        
+        // ゲーム開始
+        gameStarted = true;
+        currentPlayer = 1; // 黒（プレイヤー）から開始
+        isPlayerTurn = true;
+        
+        // 有効な着手を表示
+        showValidMoves(currentPlayer);
+      }
+    }
+    
+    // -------------------------------
+    // デスクトップモードの開始
+    // -------------------------------
+    function startDesktopMode() {
+      try {
+        // ローディング画面を表示
+        const loadingUI = document.getElementById('loadingUI');
+        if (loadingUI) {
+          loadingUI.style.display = 'flex';
+        }
+        
+        // メニューUIを非表示
+        document.getElementById('menuUI').style.display = 'none';
+        
+        // Three.jsのレンダラーを設定（XRなしの通常のレンダラー）
+        renderer.xr.enabled = false;
+        
+        // カメラの位置を設定（デスクトップ表示用）
+        camera.position.set(0, 1.5, 1.2);
+        camera.lookAt(0, 0.5, 0);
+        
+        // 通常のアニメーションループを開始
+        renderer.setAnimationLoop(renderDesktopFrame);
+        
+        // 音声の初期化
+        initSounds();
+        
+        // BGMを再生するコード
+        const audioLoader = new THREE.AudioLoader();
+        const bgm = new THREE.Audio(listener);
+        audioLoader.load('osero.mp3', function(buffer) {
+          bgm.setBuffer(buffer);
+          bgm.setLoop(true);
+          bgm.setVolume(0.3);
+          bgm.play();
+        });
+        
+        // ローディング画面を非表示
+        setTimeout(() => {
+          if (loadingUI) loadingUI.style.display = 'none';
+          
+          // 難易度選択メニュー表示
+          placeInitialEnvironment();
+          
+          // デスクトップモードのマウスコントロールを設定
+          setupDesktopControls();
+        }, 1500);
+        
+      } catch (error) {
+        // エラー時にはローディング画面を非表示に
+        const loadingUI = document.getElementById('loadingUI');
+        if (loadingUI) loadingUI.style.display = 'none';
+        
+        console.error('デスクトップモード開始中にエラー:', error);
+        alert('デスクトップモード開始中にエラーが発生しました: ' + error.message);
+      }
+    }
+
+    // 環境音のフィルタとボリュームを調整
+    function adjustEnvSoundVolume(filter, gainNode) {
+      // フィルタとボリュームノードが存在する場合のみ処理
+      if (filter && gainNode) {
+        filter.connect(gainNode);
+      }
+    }
+    
+    // -------------------------------
+    // デスクトップモード用マウス操作の設定
+    // -------------------------------
+    let raycaster = new THREE.Raycaster();
+    let mouse = new THREE.Vector2();
+    let isMouseDown = false;
+
+    function setupDesktopControls() {
+      const canvas = document.getElementById('canvas');
+      
+      // マウス移動のイベントリスナー
+      canvas.addEventListener('mousemove', function(event) {
+        // マウス位置を正規化 (-1 から 1 の範囲)
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      });
+      
+      // クリックのイベントリスナー
+      canvas.addEventListener('mousedown', function(event) {
+        isMouseDown = true;
+        handleDesktopClick();
+      });
+      
+      canvas.addEventListener('mouseup', function() {
+        isMouseDown = false;
+      });
+      
+      // ウィンドウリサイズ時の対応
+      window.addEventListener('resize', function() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
       });
     }
 
-    // ゲームの初期化
-    async function initGame() {
-      const support = await checkVRSupport();
-      const startButton = document.getElementById('startButton');
-      const info = document.getElementById('info');
-
-      if (support.vr || support.ar) {
-        startButton.textContent = 'VR/ARでプレイ開始';
-        startButton.onclick = startVRGame;
-      } else {
-        startButton.textContent = 'ブラウザでプレイ開始';
-        startButton.onclick = startBrowserGame;
-        info.textContent = 'VR/ARデバイスが検出されませんでした。ブラウザでプレイします。';
-      }
-    }
-
-    // ブラウザでのゲーム開始
-    function startBrowserGame() {
-      // ここにブラウザ用のゲーム初期化コードを追加
-      const gameContainer = document.createElement('div');
-      gameContainer.id = 'gameContainer';
-      document.body.appendChild(gameContainer);
-
-      // マウスとキーボードのイベントリスナーを追加
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('click', handleMouseClick);
-      document.addEventListener('keydown', handleKeyDown);
-    }
-
-    // マウス移動のハンドラー
-    function handleMouseMove(event) {
-      // マウスの位置に基づいてゲームの状態を更新
-    }
-
-    // マウスクリックのハンドラー
-    function handleMouseClick(event) {
-      // クリックされた位置に石を配置
-    }
-
-    // キーボード入力のハンドラー
-    function handleKeyDown(event) {
-      // キーボードショートカットの処理
-      switch(event.key) {
-        case 'ArrowLeft':
-          // 左に移動
-          break;
-        case 'ArrowRight':
-          // 右に移動
-          break;
-        case 'Enter':
-          // 石を配置
-          break;
-      }
-    }
-
-    // ページ読み込み時に初期化
-    window.addEventListener('load', initGame);
-
-    // VRゲームの開始
-    async function startVRGame() {
-      try {
-        const support = await checkVRSupport();
-        let sessionType = 'immersive-vr';
+    // -------------------------------
+    // デスクトップモード用カーソル処理
+    // -------------------------------
+    function updateDesktopCursor() {
+      // プレイヤーターンでない場合は処理しない
+      if (!gameStarted || !isPlayerTurn || !board || !boardBase) return;
+      
+      // レイキャストで交差を確認
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(boardBase);
+      
+      let cursorVisible = false;
+      
+      if (intersects.length > 0) {
+        const intersect = intersects[0];
+        const localPoint = board.worldToLocal(intersect.point.clone());
         
-        if (!support.vr && support.ar) {
-          sessionType = 'immersive-ar';
-        } else if (!support.vr && !support.ar) {
-          // VR/ARがサポートされていない場合はブラウザモードにフォールバック
-          startBrowserGame();
+        let col = Math.floor((localPoint.x + 0.25) / 0.0625);
+        let row = Math.floor((localPoint.z + 0.25) / 0.0625);
+        
+        if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+          const cellCenterX = -0.25 + 0.03125 + (col * 0.0625);
+          const cellCenterZ = -0.25 + 0.03125 + (row * 0.0625);
+          
+          // カーソル表示を更新
+          if (boardCursor) {
+            boardCursor.visible = true;
+            cursorVisible = true;
+            boardCursor.position.set(cellCenterX, 0.032, cellCenterZ);
+            
+            // カーソル色：有効なら緑、無効なら赤
+            const isValid = isValidMove(row, col, 1);
+            const cursorColor = isValid ? 0x00ff00 : 0xff0000;
+            
+            boardCursor.traverse(child => {
+              if (child instanceof THREE.Mesh && child.material.color) {
+                child.material.color.setHex(cursorColor);
+              } else if (child instanceof THREE.LineSegments && child.material.color) {
+                child.material.color.setHex(cursorColor);
+              } else if (child instanceof THREE.Points && child.material.color) {
+                child.material.color.setHex(cursorColor);
+              }
+            });
+          }
+        }
+      }
+      
+      // 盤面上にカーソルがない場合は非表示
+      if (!cursorVisible && boardCursor) {
+        boardCursor.visible = false;
+      }
+    }
+
+    // -------------------------------
+    // デスクトップモード用クリック処理
+    // -------------------------------
+    function handleDesktopClick() {
+      // プレイヤーターンでない場合は処理しない
+      if (!gameStarted || !isPlayerTurn || !board || !boardBase) return;
+      
+      raycaster.setFromCamera(mouse, camera);
+      
+      // 難易度選択メニューの処理
+      if (!difficultySelected && difficultyMenu) {
+        // メニューの子要素を検索
+        const menuIntersects = raycaster.intersectObject(difficultyMenu, true);
+        
+        if (menuIntersects.length > 0) {
+          // クリックしたボタンを見つける
+          const clickedButton = findButton(menuIntersects[0].object);
+          if (clickedButton) {
+            // 難易度ボタンがクリックされた場合
+            if (clickedButton.userData.type === 'difficultyButton') {
+              highlightButton(clickedButton);
+            }
+            // スタートボタンがクリックされた場合
+            else if (clickedButton.userData.type === 'startButton') {
+              handleStartButtonClick();
+            }
+          }
           return;
         }
-
-        const session = await navigator.xr.requestSession(sessionType, {
-          requiredFeatures: ['local-floor', 'hit-test'],
-          optionalFeatures: ['dom-overlay'],
-          domOverlay: { root: document.body }
-        });
-
-        // セッション開始後の処理
-        session.addEventListener('end', onSessionEnd);
+      }
+      
+      // ゲーム結果メニューの処理
+      if (gameResultMenu) {
+        const resultIntersects = raycaster.intersectObject(gameResultMenu, true);
         
-        // ここにVR/ARの初期化コードを追加
+        if (resultIntersects.length > 0) {
+          const clickedButton = findButton(resultIntersects[0].object);
+          if (clickedButton) {
+            if (clickedButton.userData.type === 'difficultyMenuButton') {
+              // 難易度選択に戻るボタン
+              handleDifficultyMenuButtonClick();
+            } else if (clickedButton.userData.type === 'rematchButton') {
+              // 同じ難易度で再戦ボタン
+              handleRematchButtonClick(clickedButton.userData.playerWon);
+            }
+          }
+          return;
+        }
+      }
+      
+      // 盤面のクリック処理
+      const boardIntersects = raycaster.intersectObject(boardBase);
+      
+      if (boardIntersects.length > 0) {
+        const intersect = boardIntersects[0];
+        const localPoint = board.worldToLocal(intersect.point.clone());
         
-      } catch (error) {
-        console.error('VR/ARセッションの開始に失敗しました:', error);
-        // エラーが発生した場合はブラウザモードにフォールバック
-        startBrowserGame();
-      }
-    }
-
-    // セッション終了時の処理
-    function onSessionEnd() {
-      // セッション終了時のクリーンアップ処理
-    }
-
-    // XRセッション管理
-    let xrSession = null;
-    let xrRefSpace = null;
-
-    // XRの初期化とセッション管理
-    async function initXR() {
-      if (!navigator.xr) {
-        console.log('XR is not supported');
-        return false;
-      }
-
-      try {
-        // VRとARのサポートをチェック
-        const [vrSupported, arSupported] = await Promise.all([
-          navigator.xr.isSessionSupported('immersive-vr'),
-          navigator.xr.isSessionSupported('immersive-ar')
-        ]);
-
-        if (!vrSupported && !arSupported) {
-          console.log('Neither VR nor AR is supported');
-          return false;
+        let col = Math.floor((localPoint.x + 0.25) / 0.0625);
+        let row = Math.floor((localPoint.z + 0.25) / 0.0625);
+        
+        if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+          handlePlacePiece(row, col);
         }
-
-        return {
-          vr: vrSupported,
-          ar: arSupported
-        };
-      } catch (error) {
-        console.error('Error checking XR support:', error);
-        return false;
       }
     }
 
-    // XRセッションの開始
-    async function startXRSession(sessionType) {
-      try {
-        const session = await navigator.xr.requestSession(sessionType, {
-          requiredFeatures: ['local-floor'],
-          optionalFeatures: ['dom-overlay'],
-          domOverlay: { root: document.body }
-        });
-
-        session.addEventListener('end', onSessionEnd);
-        xrRefSpace = await session.requestReferenceSpace('local');
-        xrSession = session;
-        return true;
-      } catch (error) {
-        console.error('Error starting XR session:', error);
-        return false;
-      }
-    }
-
-    // セッション終了時の処理
-    function onSessionEnd() {
-      if (xrSession) {
-        xrSession.removeEventListener('end', onSessionEnd);
-        xrSession = null;
-        xrRefSpace = null;
-      }
-    }
-
-    // ゲームの初期化
-    async function initGame() {
-      const xrSupport = await initXR();
-      const startButton = document.getElementById('startButton');
-      const info = document.getElementById('info');
-
-      if (xrSupport) {
-        if (xrSupport.vr) {
-          startButton.textContent = 'VRでプレイ開始';
-          startButton.onclick = () => startXRSession('immersive-vr');
-        } else if (xrSupport.ar) {
-          startButton.textContent = 'ARでプレイ開始';
-          startButton.onclick = () => startXRSession('immersive-ar');
+    // -------------------------------
+    // 駒を置く処理（共通処理）
+    // -------------------------------
+    function handlePlacePiece(row, col) {
+      // ゲームが開始されていない、もしくはプレイヤーのターンでない場合は処理しない
+      if (!gameStarted || !isPlayerTurn || isProcessingMove) return;
+      
+      // 有効な手かどうか確認
+      if (isValidMove(row, col, currentPlayer)) {
+        isProcessingMove = true;
+        
+        // 駒を置く音を再生
+        playSound('placePlayer');
+        
+        // 実際に駒を配置
+        placePiece(row, col, currentPlayer);
+        
+        // フリップする駒のアニメーションを開始
+        const flippedPieces = getFlippablePieces(row, col, currentPlayer);
+        for (const [r, c] of flippedPieces) {
+          flipPiece(r, c);
         }
-      } else {
-        startButton.textContent = 'ブラウザでプレイ開始';
-        startButton.onclick = startBrowserGame;
-        info.textContent = 'VR/ARデバイスが検出されませんでした。ブラウザでプレイします。';
+        
+        // ターン終了時の処理をスケジュール
+        setTimeout(() => {
+          completePlayerTurn();
+        }, 800);
       }
     }
-
-    // ページ読み込み時に初期化
-    window.addEventListener('load', initGame);
   </script>
 </body>
 </html>
