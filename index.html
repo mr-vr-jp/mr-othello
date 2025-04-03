@@ -3685,7 +3685,7 @@
             treeGroup.add(leaf);
         }
 
-        treeGroup.scale.set(1.1, 1.1, 1.1);
+        treeGroup.scale.set(0.1, 0.1, 0.1);
         return treeGroup;
       }
       
@@ -8266,7 +8266,7 @@
             treeGroup.add(leaf);
         }
 
-        treeGroup.scale.set(1.1, 1.1, 1.1);
+        treeGroup.scale.set(0.1, 0.1, 0.1);
         return treeGroup;
       }
       
@@ -9447,7 +9447,7 @@
         // 放物線の軌道を計算
         const arcHeight = piece.isCPU ? PIECE_ARC_HEIGHT * 0.8 : PIECE_ARC_HEIGHT; // CPUは少し低め
         
-        // イージング関数を適用した進行度
+        // イーズイン・イーズアウト・キュービック関数を適用した進行度
         const easeInOutProgress = easeInOutCubic(progress);
         
         // 放物線効果を計算（進行度が0.5で最大高さになる）
