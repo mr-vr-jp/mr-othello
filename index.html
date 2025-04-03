@@ -3094,10 +3094,10 @@
       mainLight.position.set(0, 10, 5);
       mainLight.castShadow = true;
       // シャドウマップの設定を調整（高品質な影用）
-      mainLight.shadow.mapSize.width = 1024;
-      mainLight.shadow.mapSize.height = 1024;
-      mainLight.shadow.camera.near = 0.5;
-      mainLight.shadow.camera.far = 50;
+      mainLight.shadow.mapSize.width = 512;
+      mainLight.shadow.mapSize.height = 512;
+      mainLight.shadow.camera.near = 1;
+      mainLight.shadow.camera.far = 30;
       // 影のエリアを制限してシャープさを向上
       mainLight.shadow.camera.left = -2;
       mainLight.shadow.camera.right = 2;
