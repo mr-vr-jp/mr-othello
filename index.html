@@ -4653,7 +4653,7 @@
       // レンダラーの作成
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // デバイスピクセル比を制限
       renderer.setClearColor(0x000000, 0);
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap; // ソフトシャドウを使用
@@ -5581,194 +5581,6 @@
 
     // -------------------------------
     // 駒を置く処理
-    // -------------------------------
-    function placePiece(row, col, player, startPosition) {
-      boardState[row][col] = player;
-          
-      const directions = [
-        [-1, -1], [-1, 0], [-1, 1],
-        [ 0, -1],          [ 0, 1],
-        [ 1, -1], [ 1, 0], [ 1, 1]
-      ];
-          
-      let flippedPieces = [];
-          
-      for (const [dx, dy] of directions) {
-        let flips = [];
-        let x = row + dx, y = col + dy;
-            
-        while (x >= 0 && x < 8 && y >= 0 && y < 8 && boardState[x][y] === -player) {
-          flips.push([x, y]);
-          x += dx;
-          y += dy;
-        }
-            
-        if (flips.length > 0 && x >= 0 && x < 8 && y >= 0 && y < 8 && boardState[x][y] === player) {
-          for (const [fx, fy] of flips) {
-            boardState[fx][fy] = player;
-            flippedPieces.push([fx, fy]);
-          }
-        }
-      }
-          
-      moveCount++;
-      updateStatus();
-      
-      // 新しい駒のアニメーションを開始（ひっくり返す駒の情報も渡す）
-      startPieceDropAnimation(row, col, player, startPosition, flippedPieces);
-          
-      // 相手のターンになったら有効手マーカーをクリア
-      clearValidMoveMarkers();
-
-      // ターンを相手に交代
-      currentPlayer = -player;
-
-      // ひっくり返すアニメーションは駒が置かれた後に実行されるため、ここでは設定だけ
-      // 実際のアニメーション開始はupdateDroppingPieces内で駒の設置完了後に行われる
-    }
-
-    // 駒をひっくり返すアニメーションを開始する関数
-    function startFlipAnimation(row, col, player) {
-      // 既存の駒があれば探す
-      let existingPiece = null;
-      for (let i = 0; i < pieces.length; i++) {
-        if (pieces[i].x === col && pieces[i].z === row) {
-          existingPiece = pieces[i].mesh;
-          break;
-        }
-      }
-
-      // 既存の駒がなければ新しく作る
-      if (!existingPiece) {
-        return;
-      }
-
-      // 影の設定を確認
-      if (!existingPiece.castShadow) {
-        existingPiece.castShadow = true;
-        existingPiece.receiveShadow = true;
-      }
-
-      // アニメーション情報を設定
-      flippingPieces.push({
-        mesh: existingPiece,
-        player: player,
-        originalY: 0.035, // 元のY位置を0.035に設定
-        targetY: 0.032,   // 目標のY位置を0.032に設定
-        frame: 0, // アニメーションフレーム
-        row: row,
-        col: col,
-        completed: false, // アニメーション完了フラグ
-        soundPlayed: false // 効果音フラグ（1回だけ再生するため）
-      });
-    }
-
-    // 駒のフリップアニメーションを更新する関数
-    function updateFlippingPieces(deltaTime) {
-      if (flippingPieces.length === 0) return;
-
-      // デルタタイムに乗数を適用してアニメーション速度を調整
-      const adjustedDelta = deltaTime * DELTA_MULTIPLIER;
-
-      for (let i = flippingPieces.length - 1; i >= 0; i--) {
-        const piece = flippingPieces[i];
-        
-        // フレームを進める
-        piece.frame += adjustedDelta;
-        
-        if (piece.frame <= FLIP_RISE_TIME) {
-          // 上昇フェーズ
-          const progress = piece.frame / FLIP_RISE_TIME;
-          const easeProgress = easeOutQuint(progress); // より自然な上昇カーブ
-          piece.mesh.position.y = piece.originalY + (FLIP_RISE_HEIGHT * easeProgress);
-          
-          // 上昇中に少し回転を始める（より自然な動き）
-          if (progress > 0.3) {
-            const preRotationProgress = (progress - 0.3) / 0.7;
-            piece.mesh.rotation.x = Math.PI * 0.2 * preRotationProgress;
-          }
-        } 
-        else if (piece.frame <= FLIP_RISE_TIME + FLIP_ROTATE_TIME) {
-          // 回転フェーズ
-          const progress = (piece.frame - FLIP_RISE_TIME) / FLIP_ROTATE_TIME;
-          const easeProgress = easeInOutSine(progress); // よりスムーズな回転カーブ
-          
-          // X軸回転（180度）- よりスムーズに
-          piece.mesh.rotation.x = Math.PI * (0.2 + easeProgress * 0.8);
-          
-          // 回転中は高さを維持し、回転の進行に合わせて徐々に下がる
-          const heightFactor = 1.0 - Math.pow(progress, 2) * 0.3;
-          piece.mesh.position.y = piece.originalY + FLIP_RISE_HEIGHT * heightFactor;
-          
-          // 回転の途中で材質を変更
-          if (progress >= 0.4 && progress <= 0.6 && !piece.materialChanging) {
-            piece.materialChanging = true;
-            
-            // 材質変更を滑らかにするため、一時的に透明度を下げる
-            piece.mesh.material.transparent = true;
-            piece.mesh.material.opacity = 0.6;
-            
-            // 少し遅れて色を変更
-            setTimeout(() => {
-              if (!piece.mesh) return; // 既に削除されている場合は何もしない
-              
-              // 材質を反対の色に変更
-              piece.mesh.material = piece.player === 1 ?
-                new THREE.MeshPhysicalMaterial({
-                  color: 0x111111,
-                  metalness: 0.15,  // 0.1から0.15に変更
-                  roughness: 0.15,  // 0.2から0.15に変更でより艶やかに
-                  reflectivity: 0.6, // 0.5から0.6に変更
-                  clearcoat: 0.4,    // 0.3から0.4に変更
-    function updatePieces() {
-      // 既存の駒を削除
-      for (const piece of pieces) {
-        board.remove(piece.mesh);
-      }
-      pieces = [];
-      
-      // 盤面状態に基づいて駒を再作成
-      for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
-          if (boardState[i][j] !== 0) {
-            createPiece(j, i, boardState[i][j]);
-          }
-        }
-      }
-    }
-
-    // -------------------------------
-    // 有効手判定
-    // -------------------------------
-    function isValidMove(row, col, player) {
-      if (boardState[row][col] !== 0) return false;
-      
-      const directions = [
-        [-1, -1], [-1, 0], [-1, 1],
-        [ 0, -1],          [ 0, 1],
-        [ 1, -1], [ 1, 0], [ 1, 1]
-      ];
-      
-      for (const [dx, dy] of directions) {
-        let x = row + dx, y = col + dy;
-        let foundOpponent = false;
-        
-        while (x >= 0 && x < 8 && y >= 0 && y < 8 && boardState[x][y] === -player) {
-          x += dx;
-          y += dy;
-          foundOpponent = true;
-        }
-        
-        if (foundOpponent && x >= 0 && x < 8 && y >= 0 && y < 8 && boardState[x][y] === player) {
-          return true;
-        }
-      }
-      
-      return false;
-    }
-
-    // -------------------------------
-    // 駒配置と挟んだ駒反転（パーティクル効果付き）
     // -------------------------------
     function placePiece(row, col, player, startPosition) {
       boardState[row][col] = player;
@@ -9518,13 +9330,15 @@
         alpha: true
       });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
-      
-      // シャドウマップを有効化
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // デバイスピクセル比を制限
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap; // ソフトシャドウを使用
       
-      // 照明設定 - 環境光の強度を元に戻す
+      // シャドウマップの解像度を下げる
+      renderer.shadowMap.autoUpdate = false;
+      renderer.shadowMap.needsUpdate = true;
+      
+      // 環境光の強度を元に戻す
       // 環境光
       scene.add(new THREE.AmbientLight(0x404060, 0.5)); // 0.6から0.5に戻す
       
@@ -9533,8 +9347,8 @@
       mainLight.position.set(0, 10, 5);
       mainLight.castShadow = true;
       // シャドウマップの設定を調整（高品質な影用）
-      mainLight.shadow.mapSize.width = 512;
-      mainLight.shadow.mapSize.height = 512;
+      mainLight.shadow.mapSize.width = 256;
+      mainLight.shadow.mapSize.height = 256;
       mainLight.shadow.camera.near = 1;
       mainLight.shadow.camera.far = 30;
       // 影のエリアを制限してシャープさを向上
@@ -9550,8 +9364,8 @@
       fillLight1.position.set(-5, 3, 5);
       // 補助光も影を落とす（より柔らかい影を追加）
       fillLight1.castShadow = false;
-      fillLight1.shadow.mapSize.width = 1024;
-      fillLight1.shadow.mapSize.height = 1024;
+      fillLight1.shadow.mapSize.width = 512;
+      fillLight1.shadow.mapSize.height = 512;
       fillLight1.shadow.camera.near = 0.5;
       fillLight1.shadow.camera.far = 30;
       fillLight1.shadow.camera.left = -1;
