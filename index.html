@@ -5123,8 +5123,114 @@
         bgm.play();
       });
       
-      // 初期環境の配置
-      placeInitialEnvironment();
+      // 盤面の作成と配置
+      board = createBoard();
+      board.position.set(0, 1, 0);
+      board.userData = {
+        fadeIn: true,
+        fadeProgress: 0,
+        fadeSpeed: 0.02,
+        initialY: 1.5,
+        targetY: 1,
+        rotationProgress: 0,
+        glowIntensity: 0,
+        glowDirection: 1
+      };
+      scene.add(board);
+      
+      // 盤面のベースメッシュを保存（衝突判定用）
+      board.traverse((child) => {
+        if (child.name === 'boardBase') {
+          boardBase = child;
+        }
+      });
+      
+      // 難易度選択メニューを作成
+      const menuGroup = new THREE.Group();
+      menuGroup.position.set(0, 1.3, -1.1);
+      
+      // メニューの背景
+      const menuGeometry = new THREE.BoxGeometry(0.8, 0.6, 0.02);
+      const menuMaterial = new THREE.MeshPhongMaterial({
+        color: 0x1a2a4a,
+        transparent: true,
+        opacity: 0.9,
+        shininess: 100
+      });
+      const menuMesh = new THREE.Mesh(menuGeometry, menuMaterial);
+      menuGroup.add(menuMesh);
+      
+      // タイトルテキスト
+      const titleText = createTextureText('難易度選択', 0.2);
+      titleText.position.set(0, 0.2, 0.02);
+      menuGroup.add(titleText);
+      
+      // 難易度ボタン
+      const buttonLabels = ['初級', '中級', '上級'];
+      const buttonValues = ['easy', 'medium', 'hard'];
+      const buttonColors = [0x4CAF50, 0x2196F3, 0xF44336];
+      const buttonY = [0.05, -0.05, -0.15];
+      
+      for (let i = 0; i < 3; i++) {
+        const buttonGroup = new THREE.Group();
+        buttonGroup.position.set(0, buttonY[i], 0.02);
+        
+        const buttonGeometry = new THREE.BoxGeometry(0.35, 0.08, 0.02);
+        const buttonMaterial = new THREE.MeshPhongMaterial({
+          color: buttonColors[i],
+          transparent: true,
+          opacity: 0.9,
+          shininess: 100
+        });
+        const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
+        buttonGroup.add(buttonMesh);
+        
+        const textMesh = createTextureText(buttonLabels[i], 0.2);
+        textMesh.position.set(0, 0, 0.02);
+        buttonGroup.add(textMesh);
+        
+        buttonGroup.userData = {
+          type: 'difficultyButton',
+          value: buttonValues[i],
+          originalColor: buttonColors[i]
+        };
+        
+        menuGroup.add(buttonGroup);
+      }
+      
+      // スタートボタン
+      const startButtonGroup = new THREE.Group();
+      startButtonGroup.position.set(0, -0.35, 0.02);
+      
+      const startBtnGeometry = new THREE.BoxGeometry(0.4, 0.08, 0.02);
+      const startBtnMaterial = new THREE.MeshPhongMaterial({
+        color: 0x4b6cb7,
+        transparent: true,
+        opacity: 0.9,
+        shininess: 100
+      });
+      const startBtnMesh = new THREE.Mesh(startBtnGeometry, startBtnMaterial);
+      startButtonGroup.add(startBtnMesh);
+      
+      const startTextMesh = createTextureText('ゲーム開始', 0.2);
+      startTextMesh.position.set(0, 0, 0.02);
+      startButtonGroup.add(startTextMesh);
+      
+      startButtonGroup.userData = {
+        type: 'startButton'
+      };
+      
+      menuGroup.add(startButtonGroup);
+      
+      // メニューをシーンに追加
+      scene.add(menuGroup);
+      difficultyMenu = menuGroup;
+      
+      // お出迎えパーティクルエフェクトを追加
+      createWelcomeEffect();
+      
+      // 効果音
+      playSound('start');
       
       // ローディング画面を非表示
       setTimeout(() => {
