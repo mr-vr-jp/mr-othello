@@ -184,6 +184,7 @@
     </div>
     
     <button id="startButton">MRモード開始</button>
+    <button id="desktopButton" style="display: none;">デスクトップモード開始</button>
     
     <div class="instructions">
       <h3>操作方法</h3>
@@ -209,6 +210,7 @@
   <canvas id="canvas"></canvas>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script>
     // グローバル変数
     let scene, camera, renderer;
@@ -1129,12 +1131,16 @@
     // VR機器検出メッセージを更新する関数
     function updateDeviceMessage(message, isDetected = false) {
       const deviceMessage = document.getElementById('device-message');
+      const desktopButton = document.getElementById('desktopButton');
       if (deviceMessage) {
         deviceMessage.textContent = message;
         if (isDetected) {
           deviceMessage.style.color = '#4eff9f'; // 検出成功時は緑色に
           document.querySelector('.device-status .icon').textContent = ''; // 矢印を削除
         }
+      }
+      if (desktopButton) {
+        desktopButton.style.display = 'block';
       }
     }
 
@@ -1146,15 +1152,15 @@
             if (supported) {
               updateDeviceMessage('VR機器を検出しました！準備完了', true);
             } else {
-              updateDeviceMessage('お使いの機器ではVRがサポートされていません');
+              updateDeviceMessage('VR機器は検出されませんでした。デスクトップモードでプレイできます。');
             }
           })
           .catch(err => {
-            updateDeviceMessage('VR機器の検出中にエラーが発生しました');
+            updateDeviceMessage('VR機器の検出中にエラーが発生しました。デスクトップモードでプレイできます。');
             console.error('VR検出エラー:', err);
           });
       } else {
-        updateDeviceMessage('お使いのブラウザはWebXRをサポートしていません');
+        updateDeviceMessage('お使いのブラウザはWebXRをサポートしていません。デスクトップモードでプレイできます。');
       }
     }
 
@@ -3144,6 +3150,7 @@
       });
       
       document.getElementById('startButton').addEventListener('click', startXRSession);
+      document.getElementById('desktopButton').addEventListener('click', startDesktopMode);
       
       // ページ読み込み時にVR機器のサポート状況をチェック
       checkVRSupport();
@@ -5074,6 +5081,119 @@
       // 接続
       noise.connect(filter);
       filter.connect(gainNode);
+    }
+
+    // デスクトップモードの開始
+    function startDesktopMode() {
+      // ローディング画面を表示
+      const loadingUI = document.getElementById('loadingUI');
+      if (loadingUI) {
+        loadingUI.style.display = 'flex';
+      }
+      
+      // メニューUIを非表示
+      document.getElementById('menuUI').style.display = 'none';
+      
+      // カメラの位置を調整
+      camera.position.set(0, 1.5, 2);
+      camera.lookAt(0, 1, 0);
+      
+      // マウスコントロールの設定
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.screenSpacePanning = false;
+      controls.minDistance = 1;
+      controls.maxDistance = 5;
+      controls.maxPolarAngle = Math.PI / 2;
+      
+      // マウスクリックイベントの設定
+      renderer.domElement.addEventListener('click', onMouseClick);
+      
+      // 音声の初期化
+      initSounds();
+      
+      // BGMを再生
+      const audioLoader = new THREE.AudioLoader();
+      const bgm = new THREE.Audio(listener);
+      audioLoader.load('osero.mp3', function(buffer) {
+        bgm.setBuffer(buffer);
+        bgm.setLoop(true);
+        bgm.setVolume(0.3);
+        bgm.play();
+      });
+      
+      // ローディング画面を非表示
+      setTimeout(() => {
+        if (loadingUI) loadingUI.style.display = 'none';
+        placeInitialEnvironment();
+      }, 1500);
+      
+      // アニメーションループを開始
+      renderer.setAnimationLoop(renderFrame);
+    }
+
+    // マウスクリックイベントの処理
+    function onMouseClick(event) {
+      if (isGripping[0] || isGripping[1]) return;
+      
+      const currentTime = Date.now();
+      const cooldownTime = 500;
+      
+      if (currentTime - lastSelectTime < cooldownTime || isProcessingMove) {
+        console.log('操作が早すぎます。少し待ってください。');
+        return;
+      }
+      
+      lastSelectTime = currentTime;
+      
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      
+      // マウス座標を正規化
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      
+      raycaster.setFromCamera(mouse, camera);
+      
+      // 難易度選択メニューの処理
+      if (difficultyMenu) {
+        const menuIntersects = raycaster.intersectObject(difficultyMenu, true);
+        
+        if (menuIntersects.length > 0) {
+          const intersectedObject = getParentWithUserData(menuIntersects[0].object);
+          
+          if (intersectedObject && intersectedObject.userData) {
+            if (intersectedObject.userData.type === 'difficultyButton') {
+              highlightButton(intersectedObject);
+            } else if (intersectedObject.userData.type === 'startButton') {
+              playSound('select');
+              initBoard();
+              initializeGame();
+            }
+          }
+          return;
+        }
+      }
+      
+      // 盤面の処理
+      if (board && boardBase) {
+        const intersects = raycaster.intersectObject(boardBase);
+        
+        if (intersects.length > 0) {
+          const intersect = intersects[0];
+          const localPoint = board.worldToLocal(intersect.point.clone());
+          
+          let col = Math.floor((localPoint.x + 0.25) / 0.0625);
+          let row = Math.floor((localPoint.z + 0.25) / 0.0625);
+          
+          if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+            if (isPlayerTurn && isValidMove(row, col, currentPlayer)) {
+              makeMove(row, col, currentPlayer);
+            }
+          }
+        }
+      }
     }
   </script>
 </body>
