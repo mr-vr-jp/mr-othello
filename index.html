@@ -5250,6 +5250,91 @@
     function onSessionEnd() {
       // セッション終了時のクリーンアップ処理
     }
+
+    // XRセッション管理
+    let xrSession = null;
+    let xrRefSpace = null;
+
+    // XRの初期化とセッション管理
+    async function initXR() {
+      if (!navigator.xr) {
+        console.log('XR is not supported');
+        return false;
+      }
+
+      try {
+        // VRとARのサポートをチェック
+        const [vrSupported, arSupported] = await Promise.all([
+          navigator.xr.isSessionSupported('immersive-vr'),
+          navigator.xr.isSessionSupported('immersive-ar')
+        ]);
+
+        if (!vrSupported && !arSupported) {
+          console.log('Neither VR nor AR is supported');
+          return false;
+        }
+
+        return {
+          vr: vrSupported,
+          ar: arSupported
+        };
+      } catch (error) {
+        console.error('Error checking XR support:', error);
+        return false;
+      }
+    }
+
+    // XRセッションの開始
+    async function startXRSession(sessionType) {
+      try {
+        const session = await navigator.xr.requestSession(sessionType, {
+          requiredFeatures: ['local-floor'],
+          optionalFeatures: ['dom-overlay'],
+          domOverlay: { root: document.body }
+        });
+
+        session.addEventListener('end', onSessionEnd);
+        xrRefSpace = await session.requestReferenceSpace('local');
+        xrSession = session;
+        return true;
+      } catch (error) {
+        console.error('Error starting XR session:', error);
+        return false;
+      }
+    }
+
+    // セッション終了時の処理
+    function onSessionEnd() {
+      if (xrSession) {
+        xrSession.removeEventListener('end', onSessionEnd);
+        xrSession = null;
+        xrRefSpace = null;
+      }
+    }
+
+    // ゲームの初期化
+    async function initGame() {
+      const xrSupport = await initXR();
+      const startButton = document.getElementById('startButton');
+      const info = document.getElementById('info');
+
+      if (xrSupport) {
+        if (xrSupport.vr) {
+          startButton.textContent = 'VRでプレイ開始';
+          startButton.onclick = () => startXRSession('immersive-vr');
+        } else if (xrSupport.ar) {
+          startButton.textContent = 'ARでプレイ開始';
+          startButton.onclick = () => startXRSession('immersive-ar');
+        }
+      } else {
+        startButton.textContent = 'ブラウザでプレイ開始';
+        startButton.onclick = startBrowserGame;
+        info.textContent = 'VR/ARデバイスが検出されませんでした。ブラウザでプレイします。';
+      }
+    }
+
+    // ページ読み込み時に初期化
+    window.addEventListener('load', initGame);
   </script>
 </body>
 </html>
