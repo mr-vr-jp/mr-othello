@@ -5213,6 +5213,43 @@
 
     // ページ読み込み時に初期化
     window.addEventListener('load', initGame);
+
+    // VRゲームの開始
+    async function startVRGame() {
+      try {
+        const support = await checkVRSupport();
+        let sessionType = 'immersive-vr';
+        
+        if (!support.vr && support.ar) {
+          sessionType = 'immersive-ar';
+        } else if (!support.vr && !support.ar) {
+          // VR/ARがサポートされていない場合はブラウザモードにフォールバック
+          startBrowserGame();
+          return;
+        }
+
+        const session = await navigator.xr.requestSession(sessionType, {
+          requiredFeatures: ['local-floor', 'hit-test'],
+          optionalFeatures: ['dom-overlay'],
+          domOverlay: { root: document.body }
+        });
+
+        // セッション開始後の処理
+        session.addEventListener('end', onSessionEnd);
+        
+        // ここにVR/ARの初期化コードを追加
+        
+      } catch (error) {
+        console.error('VR/ARセッションの開始に失敗しました:', error);
+        // エラーが発生した場合はブラウザモードにフォールバック
+        startBrowserGame();
+      }
+    }
+
+    // セッション終了時の処理
+    function onSessionEnd() {
+      // セッション終了時のクリーンアップ処理
+    }
   </script>
 </body>
 </html>
