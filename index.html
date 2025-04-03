@@ -5137,29 +5137,38 @@
     function checkVRSupport() {
       return new Promise((resolve) => {
         if (navigator.xr) {
-          navigator.xr.isSessionSupported('immersive-vr')
-            .then((supported) => {
-              resolve(supported);
+          // VRとARの両方をチェック
+          Promise.all([
+            navigator.xr.isSessionSupported('immersive-vr'),
+            navigator.xr.isSessionSupported('immersive-ar')
+          ]).then(([vrSupported, arSupported]) => {
+            resolve({
+              vr: vrSupported,
+              ar: arSupported
             });
+          });
         } else {
-          resolve(false);
+          resolve({
+            vr: false,
+            ar: false
+          });
         }
       });
     }
 
     // ゲームの初期化
     async function initGame() {
-      const hasVR = await checkVRSupport();
+      const support = await checkVRSupport();
       const startButton = document.getElementById('startButton');
       const info = document.getElementById('info');
 
-      if (hasVR) {
-        startButton.textContent = 'VRでプレイ開始';
+      if (support.vr || support.ar) {
+        startButton.textContent = 'VR/ARでプレイ開始';
         startButton.onclick = startVRGame;
       } else {
         startButton.textContent = 'ブラウザでプレイ開始';
         startButton.onclick = startBrowserGame;
-        info.textContent = 'VRデバイスが検出されませんでした。ブラウザでプレイします。';
+        info.textContent = 'VR/ARデバイスが検出されませんでした。ブラウザでプレイします。';
       }
     }
 
