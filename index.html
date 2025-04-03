@@ -3669,15 +3669,17 @@
           const angle = (i / branchCount) * Math.PI * 2;
           const height = 0.02 + (i / branchCount) * 0.05;
           
-          branch.position.y = height;
+          // 枝の位置を幹の表面に合わせる
+          const trunkRadius = 0.015; // 幹の半径
+          branch.position.set(
+            Math.cos(angle) * trunkRadius,
+            height,
+            Math.sin(angle) * trunkRadius
+          );
           
-          // 枝を水平方向に傾ける
-          branch.rotation.z = Math.PI / 2 - Math.PI / 8;
+          // 枝の向きを調整（幹から外側に向かって）
+          branch.rotation.z = Math.PI / 2;
           branch.rotation.y = angle;
-          
-          // 枝の先端にわずかに移動させる
-          branch.position.x = Math.cos(angle) * 0.01;
-          branch.position.z = Math.sin(angle) * 0.01;
           
           treeGroup.add(branch);
         }
