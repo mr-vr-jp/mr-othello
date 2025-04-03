@@ -170,6 +170,63 @@
       width: 100%;
       height: 100%;
     }
+    
+    /* ブラウザゲーム用のスタイル */
+    #gameContainer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #1a1a2e;
+    }
+
+    .game-board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 2px;
+      background: #2a2a4a;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .cell {
+      width: 60px;
+      height: 60px;
+      background: #3a3a5a;
+      border-radius: 5px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .cell:hover {
+      background: #4a4a6a;
+    }
+
+    .cell.black {
+      background: #000;
+    }
+
+    .cell.white {
+      background: #fff;
+    }
+
+    .game-info {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px;
+      border-radius: 10px;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -184,7 +241,6 @@
     </div>
     
     <button id="startButton">MRモード開始</button>
-    <button id="desktopButton" style="display: none;">デスクトップモード開始</button>
     
     <div class="instructions">
       <h3>操作方法</h3>
@@ -210,7 +266,6 @@
   <canvas id="canvas"></canvas>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script>
     // グローバル変数
     let scene, camera, renderer;
@@ -1131,16 +1186,12 @@
     // VR機器検出メッセージを更新する関数
     function updateDeviceMessage(message, isDetected = false) {
       const deviceMessage = document.getElementById('device-message');
-      const desktopButton = document.getElementById('desktopButton');
       if (deviceMessage) {
         deviceMessage.textContent = message;
         if (isDetected) {
           deviceMessage.style.color = '#4eff9f'; // 検出成功時は緑色に
           document.querySelector('.device-status .icon').textContent = ''; // 矢印を削除
         }
-      }
-      if (desktopButton) {
-        desktopButton.style.display = 'block';
       }
     }
 
@@ -1152,15 +1203,15 @@
             if (supported) {
               updateDeviceMessage('VR機器を検出しました！準備完了', true);
             } else {
-              updateDeviceMessage('VR機器は検出されませんでした。デスクトップモードでプレイできます。');
+              updateDeviceMessage('お使いの機器ではVRがサポートされていません');
             }
           })
           .catch(err => {
-            updateDeviceMessage('VR機器の検出中にエラーが発生しました。デスクトップモードでプレイできます。');
+            updateDeviceMessage('VR機器の検出中にエラーが発生しました');
             console.error('VR検出エラー:', err);
           });
       } else {
-        updateDeviceMessage('お使いのブラウザはWebXRをサポートしていません。デスクトップモードでプレイできます。');
+        updateDeviceMessage('お使いのブラウザはWebXRをサポートしていません');
       }
     }
 
@@ -3150,7 +3201,6 @@
       });
       
       document.getElementById('startButton').addEventListener('click', startXRSession);
-      document.getElementById('desktopButton').addEventListener('click', startDesktopMode);
       
       // ページ読み込み時にVR機器のサポート状況をチェック
       checkVRSupport();
@@ -5083,229 +5133,77 @@
       filter.connect(gainNode);
     }
 
-    // デスクトップモードの開始
-    function startDesktopMode() {
-      // ローディング画面を表示
-      const loadingUI = document.getElementById('loadingUI');
-      if (loadingUI) {
-        loadingUI.style.display = 'flex';
-      }
-      
-      // メニューUIを非表示
-      document.getElementById('menuUI').style.display = 'none';
-      
-      // カメラの位置を調整（より近くに）
-      camera.position.set(0, 1.5, 3);
-      camera.lookAt(0, 1, 0);
-      
-      // マウスコントロールの設定
-      const controls = new THREE.OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      controls.screenSpacePanning = false;
-      controls.minDistance = 2;
-      controls.maxDistance = 5;
-      controls.maxPolarAngle = Math.PI / 2;
-      controls.enableZoom = true;
-      controls.enablePan = true;
-      controls.enableRotate = true;
-      
-      // マウスクリックイベントの設定
-      renderer.domElement.addEventListener('click', onMouseClick);
-      
-      // 音声の初期化
-      initSounds();
-      
-      // BGMを再生
-      const audioLoader = new THREE.AudioLoader();
-      const bgm = new THREE.Audio(listener);
-      audioLoader.load('osero.mp3', function(buffer) {
-        bgm.setBuffer(buffer);
-        bgm.setLoop(true);
-        bgm.setVolume(0.3);
-        bgm.play();
-      });
-      
-      // 盤面の作成と配置（より手前に）
-      board = createBoard();
-      board.position.set(0, 1, -1);
-      board.userData = {
-        fadeIn: true,
-        fadeProgress: 0,
-        fadeSpeed: 0.02,
-        initialY: 1.5,
-        targetY: 1,
-        rotationProgress: 0,
-        glowIntensity: 0,
-        glowDirection: 1
-      };
-      scene.add(board);
-      
-      // 盤面のベースメッシュを保存（衝突判定用）
-      board.traverse((child) => {
-        if (child.name === 'boardBase') {
-          boardBase = child;
+    // VRデバイスの検出
+    function checkVRSupport() {
+      return new Promise((resolve) => {
+        if (navigator.xr) {
+          navigator.xr.isSessionSupported('immersive-vr')
+            .then((supported) => {
+              resolve(supported);
+            });
+        } else {
+          resolve(false);
         }
       });
-      
-      // 難易度選択メニューを作成（より手前に）
-      const menuGroup = new THREE.Group();
-      menuGroup.position.set(0, 1.3, -2);
-      
-      // メニューの背景
-      const menuGeometry = new THREE.BoxGeometry(0.8, 0.6, 0.02);
-      const menuMaterial = new THREE.MeshPhongMaterial({
-        color: 0x1a2a4a,
-        transparent: true,
-        opacity: 0.9,
-        shininess: 100
-      });
-      const menuMesh = new THREE.Mesh(menuGeometry, menuMaterial);
-      menuGroup.add(menuMesh);
-      
-      // タイトルテキスト
-      const titleText = createTextureText('難易度選択', 0.2);
-      titleText.position.set(0, 0.2, 0.02);
-      menuGroup.add(titleText);
-      
-      // 難易度ボタン
-      const buttonLabels = ['初級', '中級', '上級'];
-      const buttonValues = ['easy', 'medium', 'hard'];
-      const buttonColors = [0x4CAF50, 0x2196F3, 0xF44336];
-      const buttonY = [0.05, -0.05, -0.15];
-      
-      for (let i = 0; i < 3; i++) {
-        const buttonGroup = new THREE.Group();
-        buttonGroup.position.set(0, buttonY[i], 0.02);
-        
-        const buttonGeometry = new THREE.BoxGeometry(0.35, 0.08, 0.02);
-        const buttonMaterial = new THREE.MeshPhongMaterial({
-          color: buttonColors[i],
-          transparent: true,
-          opacity: 0.9,
-          shininess: 100
-        });
-        const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
-        buttonGroup.add(buttonMesh);
-        
-        const textMesh = createTextureText(buttonLabels[i], 0.2);
-        textMesh.position.set(0, 0, 0.02);
-        buttonGroup.add(textMesh);
-        
-        buttonGroup.userData = {
-          type: 'difficultyButton',
-          value: buttonValues[i],
-          originalColor: buttonColors[i]
-        };
-        
-        menuGroup.add(buttonGroup);
-      }
-      
-      // スタートボタン
-      const startButtonGroup = new THREE.Group();
-      startButtonGroup.position.set(0, -0.35, 0.02);
-      
-      const startBtnGeometry = new THREE.BoxGeometry(0.4, 0.08, 0.02);
-      const startBtnMaterial = new THREE.MeshPhongMaterial({
-        color: 0x4b6cb7,
-        transparent: true,
-        opacity: 0.9,
-        shininess: 100
-      });
-      const startBtnMesh = new THREE.Mesh(startBtnGeometry, startBtnMaterial);
-      startButtonGroup.add(startBtnMesh);
-      
-      const startTextMesh = createTextureText('ゲーム開始', 0.2);
-      startTextMesh.position.set(0, 0, 0.02);
-      startButtonGroup.add(startTextMesh);
-      
-      startButtonGroup.userData = {
-        type: 'startButton'
-      };
-      
-      menuGroup.add(startButtonGroup);
-      
-      // メニューをシーンに追加
-      scene.add(menuGroup);
-      difficultyMenu = menuGroup;
-      
-      // お出迎えパーティクルエフェクトを追加
-      createWelcomeEffect();
-      
-      // 効果音
-      playSound('start');
-      
-      // ローディング画面を非表示
-      setTimeout(() => {
-        if (loadingUI) loadingUI.style.display = 'none';
-      }, 1500);
-      
-      // アニメーションループを開始
-      renderer.setAnimationLoop(renderFrame);
     }
 
-    // マウスクリックイベントの処理
-    function onMouseClick(event) {
-      if (isGripping[0] || isGripping[1]) return;
-      
-      const currentTime = Date.now();
-      const cooldownTime = 500;
-      
-      if (currentTime - lastSelectTime < cooldownTime || isProcessingMove) {
-        console.log('操作が早すぎます。少し待ってください。');
-        return;
-      }
-      
-      lastSelectTime = currentTime;
-      
-      const raycaster = new THREE.Raycaster();
-      const mouse = new THREE.Vector2();
-      
-      // マウス座標を正規化
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-      
-      raycaster.setFromCamera(mouse, camera);
-      
-      // 難易度選択メニューの処理
-      if (difficultyMenu) {
-        const menuIntersects = raycaster.intersectObject(difficultyMenu, true);
-        
-        if (menuIntersects.length > 0) {
-          const intersectedObject = getParentWithUserData(menuIntersects[0].object);
-          
-          if (intersectedObject && intersectedObject.userData) {
-            if (intersectedObject.userData.type === 'difficultyButton') {
-              highlightButton(intersectedObject);
-            } else if (intersectedObject.userData.type === 'startButton') {
-              playSound('select');
-              initBoard();
-              initializeGame();
-            }
-          }
-          return;
-        }
-      }
-      
-      // 盤面の処理
-      if (board && boardBase) {
-        const intersects = raycaster.intersectObject(boardBase);
-        
-        if (intersects.length > 0) {
-          const intersect = intersects[0];
-          const localPoint = board.worldToLocal(intersect.point.clone());
-          
-          let col = Math.floor((localPoint.x + 0.25) / 0.0625);
-          let row = Math.floor((localPoint.z + 0.25) / 0.0625);
-          
-          if (col >= 0 && col < 8 && row >= 0 && row < 8) {
-            if (isPlayerTurn && isValidMove(row, col, currentPlayer)) {
-              makeMove(row, col, currentPlayer);
-            }
-          }
-        }
+    // ゲームの初期化
+    async function initGame() {
+      const hasVR = await checkVRSupport();
+      const startButton = document.getElementById('startButton');
+      const info = document.getElementById('info');
+
+      if (hasVR) {
+        startButton.textContent = 'VRでプレイ開始';
+        startButton.onclick = startVRGame;
+      } else {
+        startButton.textContent = 'ブラウザでプレイ開始';
+        startButton.onclick = startBrowserGame;
+        info.textContent = 'VRデバイスが検出されませんでした。ブラウザでプレイします。';
       }
     }
+
+    // ブラウザでのゲーム開始
+    function startBrowserGame() {
+      // ここにブラウザ用のゲーム初期化コードを追加
+      const gameContainer = document.createElement('div');
+      gameContainer.id = 'gameContainer';
+      document.body.appendChild(gameContainer);
+
+      // マウスとキーボードのイベントリスナーを追加
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('click', handleMouseClick);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    // マウス移動のハンドラー
+    function handleMouseMove(event) {
+      // マウスの位置に基づいてゲームの状態を更新
+    }
+
+    // マウスクリックのハンドラー
+    function handleMouseClick(event) {
+      // クリックされた位置に石を配置
+    }
+
+    // キーボード入力のハンドラー
+    function handleKeyDown(event) {
+      // キーボードショートカットの処理
+      switch(event.key) {
+        case 'ArrowLeft':
+          // 左に移動
+          break;
+        case 'ArrowRight':
+          // 右に移動
+          break;
+        case 'Enter':
+          // 石を配置
+          break;
+      }
+    }
+
+    // ページ読み込み時に初期化
+    window.addEventListener('load', initGame);
   </script>
 </body>
 </html>
