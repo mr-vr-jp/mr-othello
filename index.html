@@ -5094,8 +5094,8 @@
       // メニューUIを非表示
       document.getElementById('menuUI').style.display = 'none';
       
-      // カメラの位置を調整
-      camera.position.set(0, 1.5, 2);
+      // カメラの位置を調整（より近くに）
+      camera.position.set(0, 1.5, 3);
       camera.lookAt(0, 1, 0);
       
       // マウスコントロールの設定
@@ -5103,7 +5103,7 @@
       controls.enableDamping = true;
       controls.dampingFactor = 0.05;
       controls.screenSpacePanning = false;
-      controls.minDistance = 1;
+      controls.minDistance = 2;
       controls.maxDistance = 5;
       controls.maxPolarAngle = Math.PI / 2;
       
@@ -5123,9 +5123,9 @@
         bgm.play();
       });
       
-      // 盤面の作成と配置
+      // 盤面の作成と配置（より手前に）
       board = createBoard();
-      board.position.set(0, 1, 0);
+      board.position.set(0, 1, -1);
       board.userData = {
         fadeIn: true,
         fadeProgress: 0,
@@ -5145,9 +5145,9 @@
         }
       });
       
-      // 難易度選択メニューを作成
+      // 難易度選択メニューを作成（より手前に）
       const menuGroup = new THREE.Group();
-      menuGroup.position.set(0, 1.3, -1.1);
+      menuGroup.position.set(0, 1.3, -2);
       
       // メニューの背景
       const menuGeometry = new THREE.BoxGeometry(0.8, 0.6, 0.02);
