@@ -5075,6 +5075,126 @@
       noise.connect(filter);
       filter.connect(gainNode);
     }
+
+    // 枝のある松の実装例
+    function createBranchyPine() {
+      const group = new THREE.Group();
+      
+      // メインの松の木
+      const mainPine = createBasePine();
+      mainPine.scale.set(1.1, 1.1, 1.1);
+      
+      // 特徴的な枝の追加
+      const branch1 = createPineBranch();
+      branch1.position.set(0.2, 0.6, 0);
+      branch1.rotation.z = -Math.PI / 4;
+      
+      const branch2 = createPineBranch();
+      branch2.position.set(-0.15, 0.5, 0);
+      branch2.rotation.z = Math.PI / 3;
+      
+      group.add(mainPine, branch1, branch2);
+      return group;
+    }
+
+    // 苔と下草のある松の実装例
+    function createMossyPine() {
+      const group = new THREE.Group();
+      
+      // メインの松の木
+      const mainPine = createBasePine();
+      mainPine.scale.set(0.95, 0.95, 0.95);
+      
+      // 下草の追加
+      const grass = createGrassCluster();
+      grass.position.y = 0.01;
+      
+      // 苔のグラウンドカバー
+      const mossGround = createMossGround();
+      mossGround.position.y = 0.001;
+      
+      group.add(mainPine, grass, mossGround);
+      return group;
+    }
+
+    // 岩と組み合わせた松の実装例
+    function createRockyPine() {
+      const group = new THREE.Group();
+      
+      // メインの松の木
+      const mainPine = createBasePine();
+      
+      // 岩の追加
+      const rock = createRock();
+      rock.position.set(-0.1, 0, -0.1);
+      
+      // 岩の苔
+      const rockMoss = createRockMoss();
+      rockMoss.position.copy(rock.position);
+      
+      group.add(mainPine, rock, rockMoss);
+      return group;
+    }
+
+    // 二本セットの松の実装例
+    function createPinePair() {
+      const group = new THREE.Group();
+      
+      // 親木
+      const parentPine = createBasePine();
+      parentPine.scale.set(1.05, 1.05, 1.05);
+      
+      // 子木
+      const childPine = createBasePine();
+      childPine.scale.set(0.7, 0.7, 0.7);
+      childPine.position.set(0.2, 0, 0.1);
+      childPine.rotation.y = Math.PI / 6;
+      
+      group.add(parentPine, childPine);
+      return group;
+    }
+
+    // 下草クラスターの作成
+    function createGrassCluster() {
+      const group = new THREE.Group();
+      
+      // 複数の草を不規則に配置
+      for (let i = 0; i < 8; i++) {
+        const grass = createSingleGrass();
+        grass.position.set(
+          (Math.random() - 0.5) * 0.3,
+          0,
+          (Math.random() - 0.5) * 0.3
+        );
+        grass.rotation.y = Math.random() * Math.PI * 2;
+        group.add(grass);
+      }
+      
+      return group;
+    }
+
+    // 岩の作成
+    function createRock() {
+      const geometry = new THREE.DodecahedronGeometry(0.15, 1);
+      // ジオメトリを不規則に変形
+      const vertices = geometry.attributes.position;
+      for (let i = 0; i < vertices.count; i++) {
+        vertices.setXYZ(
+          i,
+          vertices.getX(i) + (Math.random() - 0.5) * 0.05,
+          vertices.getY(i) + (Math.random() - 0.5) * 0.05,
+          vertices.getZ(i) + (Math.random() - 0.5) * 0.05
+        );
+      }
+      
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x666666,
+        roughness: 0.8,
+        metalness: 0.2
+      });
+      
+      return new THREE.Mesh(geometry, material);
+    }
   </script>
 </body>
 </html>
