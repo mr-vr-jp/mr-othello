@@ -3573,111 +3573,119 @@
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
         treeGroup.add(trunk);
         
-        // メイン枝と葉の構造を作成
-        const createBranchWithLeaves = (length, thickness, branchColor, leafColor, complexity) => {
-          const branchGroup = new THREE.Group();
-          
-          // 枝の作成
-          const branchGeometry = new THREE.CylinderGeometry(thickness * 0.6, thickness, length, 5);
-          const branchMaterial = new THREE.MeshStandardMaterial({
-            color: branchColor,
-            roughness: 0.8,
-            metalness: 0.05
-          });
-          
-          // 枝のメッシュを作成し少し回転
-          const branch = new THREE.Mesh(branchGeometry, branchMaterial);
-          branch.rotation.x = Math.PI / 2; // 水平方向に向ける
-          branchGroup.add(branch);
-          
-          // 枝の先端位置
-          const tipPosition = new THREE.Vector3(length, 0, 0);
-          
-          // 葉っぱをつける
-          const leafCount = Math.floor(complexity * 8); // 複雑さに応じた葉の数
-          for(let i = 0; i < leafCount; i++) {
-            // 葉の基本形状（平面）
-            const leafSize = 0.01 + Math.random() * 0.007;
-            const leafGeometry = new THREE.PlaneGeometry(leafSize, leafSize * 1.5);
-            
-            // 葉の色にランダム性を加える
-            const leafMat = new THREE.MeshStandardMaterial({
-              color: new THREE.Color(leafColor).offsetHSL(0, 0, (Math.random() - 0.5) * 0.1),
-              roughness: 0.7,
-              metalness: 0.05,
-              side: THREE.DoubleSide
-            });
-            
-            const leaf = new THREE.Mesh(leafGeometry, leafMat);
-            
-            // 葉を枝に沿ってランダムに配置
-            const leafPosition = Math.random() * 0.7 + 0.3; // 枝の30%～100%の位置に配置
-            leaf.position.set(length * leafPosition, 0, 0);
-            
-            // 葉をランダムに回転
-            leaf.rotation.z = Math.random() * Math.PI * 2;
-            leaf.rotation.y = Math.random() * Math.PI / 4;
-            leaf.rotation.x = Math.random() * Math.PI / 4;
-            
-            branch.add(leaf);
-          }
-          
-          // 小枝の再帰的作成（複雑さに応じて）
-          if (complexity > 1) {
-            const subBranchCount = Math.floor(Math.random() * 2) + 1;
-            for (let i = 0; i < subBranchCount; i++) {
-              const subLength = length * (0.4 + Math.random() * 0.3);
-              const subThickness = thickness * 0.6;
-              const subBranch = createBranchWithLeaves(
-                subLength, 
-                subThickness, 
-                branchColor,
-                leafColor,
-                complexity - 1
-              );
-              
-              // 小枝の位置決め（親枝の中間～先端付近）
-              const branchPos = 0.5 + Math.random() * 0.45;
-              subBranch.position.set(length * branchPos, 0, 0);
-              
-              // 小枝の角度をランダムに設定
-              subBranch.rotation.z = (Math.random() - 0.5) * Math.PI * 0.2;
-              subBranch.rotation.y = Math.random() * Math.PI * 2;
-              
-              branch.add(subBranch);
-            }
-          }
-          
-          return branchGroup;
-        };
+        // 葉の形状を改善する
+        const leafGeometry = new THREE.SphereGeometry(0.03, 6, 6);
+        leafGeometry.scale(1, 0.4, 1); // 扁平な葉の形状
         
-        // メインの枝を幹から伸ばす
-        const mainBranchCount = 7;
-        const mainBranchColor = 0x5a3d28;
-        const leafColor = 0x4a8038;
+        // 緑の葉のマテリアル
+        const leafMaterial = new THREE.MeshStandardMaterial({
+          color: 0x4a8038,
+          roughness: 0.7, 
+          metalness: 0.1,
+          side: THREE.DoubleSide
+        });
         
-        for (let i = 0; i < mainBranchCount; i++) {
-          const height = 0.02 + i * 0.01; // 枝の高さを少しずつ上げる
-          const angle = i * Math.PI * 2 / mainBranchCount;
-          const complexity = 3 - Math.floor(i / 3); // 下の枝ほど複雑に
+        // より安定した樹冠構造を作成
+        const foliageGroup = new THREE.Group();
+        
+        // メインの葉の塊を作成（樹冠）
+        const foliageCount = 15;
+        for (let i = 0; i < foliageCount; i++) {
+          const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
           
-          const mainBranch = createBranchWithLeaves(
-            0.05 + Math.random() * 0.02, // 長さ
-            0.005, // 太さ
-            mainBranchColor,
-            leafColor,
-            complexity
-          );
+          // 樹冠内でのランダムな位置
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.random() * Math.PI * 0.5;
+          const radius = 0.035 + Math.random() * 0.015;
           
-          mainBranch.position.y = height;
-          mainBranch.rotation.y = angle;
-          mainBranch.rotation.z = Math.PI / 6 + (Math.random() - 0.5) * Math.PI * 0.1;
+          const x = radius * Math.sin(phi) * Math.cos(theta);
+          const y = 0.07 + radius * Math.cos(phi);
+          const z = radius * Math.sin(phi) * Math.sin(theta);
           
-          treeGroup.add(mainBranch);
+          leaf.position.set(x, y, z);
+          
+          // ランダムな回転
+          leaf.rotation.x = Math.random() * Math.PI;
+          leaf.rotation.y = Math.random() * Math.PI;
+          leaf.rotation.z = Math.random() * Math.PI;
+          
+          // ランダムなスケーリング
+          const scale = 0.8 + Math.random() * 0.4;
+          leaf.scale.set(scale, scale, scale);
+          
+          // 色の微妙な変化
+          leaf.material = leafMaterial.clone();
+          leaf.material.color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.1);
+          
+          foliageGroup.add(leaf);
         }
         
-        // スケールを調整
-        treeGroup.scale.set(1.2, 1.2, 1.2);
+        // 側面の葉（より小さく）
+        const sideFoliageCount = 10;
+        for (let i = 0; i < sideFoliageCount; i++) {
+          const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+          
+          // 幹の周りの側面にランダムに配置
+          const angle = Math.random() * Math.PI * 2;
+          const height = 0.02 + Math.random() * 0.05;
+          const radius = 0.025 + Math.random() * 0.01;
+          
+          leaf.position.set(
+            Math.cos(angle) * radius,
+            height,
+            Math.sin(angle) * radius
+          );
+          
+          // ランダムな回転
+          leaf.rotation.x = Math.random() * Math.PI;
+          leaf.rotation.y = Math.random() * Math.PI;
+          leaf.rotation.z = Math.random() * Math.PI;
+          
+          // より小さく
+          const scale = 0.5 + Math.random() * 0.3;
+          leaf.scale.set(scale, scale, scale);
+          
+          // 色の微妙な変化
+          leaf.material = leafMaterial.clone();
+          leaf.material.color.offsetHSL(0, 0, (Math.random() - 0.5) * 0.1);
+          
+          foliageGroup.add(leaf);
+        }
+        
+        // 簡易的な枝を数本追加
+        const branchCount = 5;
+        const branchMaterial = new THREE.MeshStandardMaterial({
+          color: 0x5a3d28,
+          roughness: 0.8,
+          metalness: 0.05
+        });
+        
+        for (let i = 0; i < branchCount; i++) {
+          const branchLength = 0.03 + Math.random() * 0.02;
+          const branchGeometry = new THREE.CylinderGeometry(0.002, 0.004, branchLength, 5);
+          const branch = new THREE.Mesh(branchGeometry, branchMaterial);
+          
+          // 枝の位置（幹の中心から外側に向かって）
+          const angle = (i / branchCount) * Math.PI * 2;
+          const height = 0.02 + (i / branchCount) * 0.05;
+          
+          branch.position.y = height;
+          
+          // 枝を水平方向に傾ける
+          branch.rotation.z = Math.PI / 2 - Math.PI / 8;
+          branch.rotation.y = angle;
+          
+          // 枝の先端にわずかに移動させる
+          branch.position.x = Math.cos(angle) * 0.01;
+          branch.position.z = Math.sin(angle) * 0.01;
+          
+          treeGroup.add(branch);
+        }
+        
+        treeGroup.add(foliageGroup);
+        
+        // 全体のスケールを調整
+        treeGroup.scale.set(1.1, 1.1, 1.1);
         
         return treeGroup;
       }
