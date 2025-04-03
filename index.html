@@ -239,6 +239,9 @@
     let welcomeParticles = []; // お出迎えパーティクル用
     let lastSelectTime = 0; // 最後にselectイベントが発生した時間を保持
     let isProcessingMove = false; // 駒を置く処理中かどうかのフラグ
+    let raycaster = new THREE.Raycaster(); // デスクトップモード用のレイキャスター
+    let mouse = new THREE.Vector2(); // デスクトップモード用のマウス位置
+    let isMouseDown = false; // デスクトップモード用のマウス状態
 
     // 持ち駒ケース関連の変数
     let playerPieceCase; // プレイヤーの持ち駒ケース
@@ -573,10 +576,6 @@
     // -------------------------------
     // デスクトップモード用のマウス操作設定
     // -------------------------------
-    let raycaster = new THREE.Raycaster();
-    let mouse = new THREE.Vector2();
-    let isMouseDown = false;
-
     function setupDesktopControls() {
       const canvas = document.getElementById('canvas');
       
@@ -719,7 +718,24 @@
         let row = Math.floor((localPoint.z + 0.25) / 0.0625);
         
         if (col >= 0 && col < 8 && row >= 0 && row < 8) {
-          handlePlacePiece(row, col);
+          if (isValidMove(row, col, 1)) {
+            console.log('==== 駒を置く処理開始 ====');
+            
+            // 処理中フラグをオン
+            isProcessingMove = true;
+            
+            // プレイヤーターンを一時的に無効化（駒のアニメーション中に再度置けないようにする）
+            isPlayerTurn = false;
+            
+            // 駒を置く
+            placePiece(row, col, 1, null); // デスクトップモードではコントローラーはnull
+            updateGameMessage(`プレイヤーが (${col+1}, ${row+1}) に置きました。\nCPUの番です。`);
+            
+            // すべてのアニメーションが完了したらisProcessingMoveフラグは
+            // checkGameStateAndProceed関数内でリセットされる
+          } else {
+            updateGameMessage('そこには置けません。別の場所を選んでください。');
+          }
         }
       }
     }
@@ -1681,7 +1697,7 @@
               isPlayerTurn = false;
               
               // 駒を置く
-              placePiece(row, col, 1, controller); // コントローラーオブジェクト自体を渡す
+              placePiece(row, col, 1, null); // デスクトップモードではコントローラーはnull
               updateGameMessage(`プレイヤーが (${col+1}, ${row+1}) に置きました。\nCPUの番です。`);
               
               // すべてのアニメーションが完了したらisProcessingMoveフラグは
@@ -2685,10 +2701,6 @@
     // -------------------------------
     // デスクトップモード用マウス操作の設定
     // -------------------------------
-    let raycaster = new THREE.Raycaster();
-    let mouse = new THREE.Vector2();
-    let isMouseDown = false;
-
     function setupDesktopControls() {
       const canvas = document.getElementById('canvas');
       
