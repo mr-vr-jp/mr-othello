@@ -3,6 +3,10 @@ body {
   font-family: 'Segoe UI', 'Meiryo UI', Meiryo, Arial, sans-serif;
   overflow: hidden;
   background-color: #1a1a2e;
+  background-image: url('../assets/textures/background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   color: #e6e6ff;
 }
 .ui-container {
