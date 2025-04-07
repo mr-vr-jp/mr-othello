@@ -17,8 +17,8 @@ let difficultySelected = false;
 let playerWins = 0, cpuWins = 0, draws = 0, moveCount = 0;
 let difficultyLevel = 'medium'; // デフォルトは中級
 let gameResultMenu; // ゲーム結果メニュー
-let particles = []; // パーティクル効果用
-let fireworks = []; // 花火効果用
+let particles = [];    // パーティクル効果用
+let fireworks = [];    // 花火効果用
 let soundEnabled = true; // 音声有効フラグ
 let listener; // 音声リスナー
 let sounds = {}; // 音声オブジェクト格納用
@@ -27,6 +27,7 @@ let lastSelectTime = 0; // 最後にselectイベントが発生した時間を�
 let isProcessingMove = false; // 駒を置く処理中かどうかのフラグ
 let exitButton; // WebXR終了ボタン
 let bgm; // BGMオーディオオブジェクト
+let clock = new THREE.Clock(); // deltaTime計算用のクロック変数
 
 // 持ち駒ケース関連の変数
 let playerPieceCase; // プレイヤーの持ち駒ケース
@@ -456,548 +457,456 @@ function onSelectEnd(event) {
 // セレクトイベントの処理
 // -------------------------------
 function onSelect(event) {
-  // セレクトイベントの処理
-  const controller = event.target;
-  const index = controllers.indexOf(controller);
-  if (index !== -1) {
-    // セレクトイベントの処理
-    handleSelectEvent(index);
-  }
-}
-
-// -------------------------------
-// セレクトイベントの処理
-// -------------------------------
-function handleSelectEvent(controllerIndex) {
-  // セレクトイベントの処理
-  if (isProcessingMove) return;
-  
-  // 最後のselectイベントからの経過時間を計算
-  const currentTime = performance.now();
-  const timeSinceLastSelect = currentTime - lastSelectTime;
-  lastSelectTime = currentTime;
-  
-  // 連続したselectイベントの間隔が短すぎる場合は無視
-  if (timeSinceLastSelect < 500) return;
-  
-  // ゲームが開始されていない場合は無視
-  if (!gameStarted) return;
-  
-  // 難易度が選択されていない場合は無視
-  if (!difficultySelected) return;
-  
-  // プレイヤーのターンでない場合は無視
-  if (!isPlayerTurn) return;
-  
-  // コントローラーの位置を取得
-  const controller = controllers[controllerIndex];
-  const controllerPos = new THREE.Vector3();
-  controller.getWorldPosition(controllerPos);
-  
-  // オセロ盤の位置を取得
-  const boardPos = new THREE.Vector3();
-  board.getWorldPosition(boardPos);
-  
-  // コントローラーの位置をオセロ盤のローカル座標系に変換
-  const localControllerPos = controllerPos.clone().sub(boardPos);
-  
-  // オセロ盤のセルに対応する行と列を計算
-  const cellSize = 0.0625;
-  const row = Math.floor((localControllerPos.z + 0.25) / cellSize);
-  const col = Math.floor((localControllerPos.x + 0.25) / cellSize);
-  
-  // 有効なセルかどうかをチェック
-  if (row >= 0 && row < 8 && col >= 0 && col < 8) {
-    // 有効なセルの場合、駒を置く処理を開始
-    placePiece(row, col);
-  }
-}
-
-// -------------------------------
-// 駒を置く処理
-// -------------------------------
-function placePiece(row, col) {
-  // 駒を置く処理
-  if (isProcessingMove) return;
-  
-  // 有効なセルかどうかをチェック
-  if (!isValidMove(row, col, currentPlayer)) return;
-  
-  // 駒を置く処理中フラグを立てる
-  isProcessingMove = true;
-  
-  // 駒を置くアニメーションを開始
-  animatePiecePlacement(row, col);
-}
-
-// -------------------------------
-// 駒を置くアニメーション
-// -------------------------------
-function animatePiecePlacement(row, col) {
-  // 駒を置くアニメーション
-  const piece = createPiece(currentPlayer);
-  piece.position.set(0, 0.035, 0);
-  piece.rotation.x = -Math.PI / 2;
-  piece.userData = {
-    row: row,
-    col: col,
-    animationPhase: 0,
-    animationDuration: 0.5,
-    startTime: performance.now()
-  };
-  board.add(piece);
-  pieces.push(piece);
-  
-  // 駒を落とすアニメーションを開始
-  animatePieceDrop(piece);
-}
-
-// -------------------------------
-// 駒を落とすアニメーション
-// -------------------------------
-function animatePieceDrop(piece) {
-  // 駒を落とすアニメーション
-  const dropDuration = 0.5;
-  const dropHeight = 0.2;
-  const dropStartTime = performance.now();
-  
-  const dropAnimation = () => {
-    const currentTime = performance.now();
-    const elapsedTime = (currentTime - dropStartTime) / 1000;
-    const progress = Math.min(elapsedTime / dropDuration, 1);
-    
-    // 駒を上から落とすアニメーション
-    const y = dropHeight * (1 - progress);
-    piece.position.y = y;
-    
-    if (progress < 1) {
-      requestAnimationFrame(dropAnimation);
-    } else {
-      // 落下アニメーションが終了したら、駒を置く処理を完了
-      completePiecePlacement(piece);
+  // WebXR終了ボタンの押下判定
+  if (exitButton && exitButton.userData.hovering) {
+    playSound('select');
+    if (xrSession) {
+      xrSession.end();
     }
-  };
-  
-  dropAnimation();
-}
-
-// -------------------------------
-// 駒を置く処理を完了
-// -------------------------------
-function completePiecePlacement(piece) {
-  // 駒を置く処理を完了
-  const row = piece.userData.row;
-  const col = piece.userData.col;
-  
-  // 盤面の状態を更新
-  boardState[row][col] = currentPlayer;
-  
-  // 駒を置いたセルの周囲の駒をひっくり返す
-  flipPieces(row, col);
-  
-  // 駒を置く処理中フラグを解除
-  isProcessingMove = false;
-  
-  // プレイヤーのターンを終了
-  endPlayerTurn();
-}
-
-// -------------------------------
-// 駒をひっくり返すアニメーション
-// -------------------------------
-function flipPieces(row, col) {
-  // 駒をひっくり返すアニメーション
-  const directions = [
-    { dx: -1, dy: 0 }, // 左
-    { dx: 1, dy: 0 }, // 右
-    { dx: 0, dy: -1 }, // 上
-    { dx: 0, dy: 1 }, // 下
-    { dx: -1, dy: -1 }, // 左上
-    { dx: 1, dy: -1 }, // 右上
-    { dx: -1, dy: 1 }, // 左下
-    { dx: 1, dy: 1 } // 右下
-  ];
-  
-  directions.forEach(direction => {
-    const dx = direction.dx;
-    const dy = direction.dy;
-    let x = row + dx;
-    let y = col + dy;
-    
-    while (x >= 0 && x < 8 && y >= 0 && y < 8) {
-      if (boardState[x][y] === -currentPlayer) {
-        boardState[x][y] = currentPlayer;
-        x += dx;
-        y += dy;
-      } else if (boardState[x][y] === currentPlayer) {
-        break;
-      } else {
-        break;
-      }
-    }
-  });
-}
-
-// リッチなケースのテクスチャを作成する関数
-function createCaseTexture(baseColor, isMetallic = false) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  
-  // 背景色
-  ctx.fillStyle = baseColor;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  if (isMetallic) {
-    // 金属風の光沢
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.7)');
-    gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.1)');
-    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
-    gradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.1)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.5)');
-    
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // 細かい光沢のラインを追加
-    for (let i = 0; i < 10; i++) {
-      const lineWidth = Math.random() * 2 + 1;
-      const x = Math.random() * canvas.width;
-      
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.lineWidth = lineWidth;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x + canvas.width * 0.1, canvas.height);
-      ctx.stroke();
-    }
-  } else {
-    // 木目調テクスチャ
-    for (let i = 0; i < 20; i++) {
-      const y = Math.random() * canvas.height;
-      const width = Math.random() * 10 + 5;
-      
-      ctx.strokeStyle = `rgba(60, 30, 15, ${Math.random() * 0.15 + 0.05})`;
-      ctx.lineWidth = width;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.bezierCurveTo(
-        canvas.width * 0.3, y + Math.random() * 20 - 10,
-        canvas.width * 0.6, y + Math.random() * 20 - 10,
-        canvas.width, y + Math.random() * 40 - 20
-      );
-      ctx.stroke();
-    }
-  }
-  
-  // エッジを強調
-  ctx.strokeStyle = isMetallic ? 'rgba(255, 255, 255, 0.8)' : 'rgba(30, 15, 5, 0.5)';
-  ctx.lineWidth = 8;
-  ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
-  
-  const texture = new THREE.CanvasTexture(canvas);
-  return texture;
-}
-
-// 持ち駒ケースを作成する関数
-function createPieceCase(isPlayer) {
-  const caseGroup = new THREE.Group();
-  
-  // 盤面と一体化したトレイ部分（細長い溝型）
-  const caseWidth = 0.5;  // 盤面と同じ幅
-  const caseHeight = 0.02; // 薄くする
-  const caseDepth = 0.08;  // 奥行きを小さく
-  
-  const caseGeometry = new THREE.BoxGeometry(caseWidth, caseHeight, caseDepth);
-  
-  // プレイヤーとCPUで共通の黒系マテリアル（盤面枠と同系色）
-  const caseMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x3d2b1f, 
-    roughness: 0.4,
-    metalness: 0.3,
-  });
-  
-  const caseBox = new THREE.Mesh(caseGeometry, caseMaterial);
-  // 影の設定を追加
-  caseBox.castShadow = true;
-  caseBox.receiveShadow = true;
-  caseGroup.add(caseBox);
-  
-  // 内側の溝（駒を置く部分）
-  const grooveWidth = 0.46; // 少し狭く
-  const grooveHeight = 0.005;
-  const grooveDepth = 0.06;
-  
-  const grooveGeometry = new THREE.BoxGeometry(grooveWidth, grooveHeight, grooveDepth);
-  const grooveMaterial = new THREE.MeshStandardMaterial({
-    color: 0x1a0d00,
-    roughness: 0.7,
-    metalness: 0.1
-  });
-  
-  const groove = new THREE.Mesh(grooveGeometry, grooveMaterial);
-  groove.position.y = 0.008; // 少し上に
-  // 影の設定を追加
-  groove.castShadow = true;
-  groove.receiveShadow = true;
-  caseGroup.add(groove);
-  
-  // ユーザーデータを設定（後で参照するため）
-  caseGroup.userData = {
-    isPlayerCase: isPlayer,
-    type: 'pieceCase'
-  };
-  
-  return caseGroup;
-}
-
-// 持ち駒を増減させる関数
-function decreasePlayerPieces() {
-  if (playerRemainingPieces > 0) {
-    playerRemainingPieces--;
-    updatePieceCaseDisplay(true);
-  }
-}
-
-function decreaseCPUPieces() {
-  if (cpuRemainingPieces > 0) {
-    cpuRemainingPieces--;
-    updatePieceCaseDisplay(false);
-  }
-}
-
-// 持ち駒ケースの表示を更新する関数
-function updatePieceCaseDisplay(isPlayer) {
-  const pieceCase = isPlayer ? playerPieceCase : cpuPieceCase;
-  const remainingPieces = isPlayer ? playerRemainingPieces : cpuRemainingPieces;
-  const displayedPieces = isPlayer ? displayedPlayerPieces : displayedCpuPieces;
-  
-  // 既存の駒をクリア
-  while (displayedPieces.length > 0) {
-    const pieceToRemove = displayedPieces.pop();
-    pieceCase.remove(pieceToRemove);
-  }
-  
-  // 駒の表示数と間隔の設定
-  const maxPieces = MAX_PIECES; // 最大32個
-  const displayWidth = 0.45;    // トレイの内側幅
-  
-  // 32個の駒が一列に収まるように間隔を調整
-  const spacing = displayWidth / (maxPieces + 1);
-  
-  // 左端の開始位置
-  const startX = -displayWidth / 2 + spacing;
-  
-  // 駒を配置（プレイヤーは左から減る、CPUは右から減る）
-  for (let i = 0; i < remainingPieces; i++) {
-    // 盤面の駒と同じサイズで
-    const radius = 0.028;  // 盤面と同じ半径
-    const height = 0.004;  // 盤面と同じ高さ
-    const segments = 32;   // 円周の分割数
-    const radiusSegments = 32; // エッジの滑らかさのための分割数
-    
-    // エッジを丸くした円柱ジオメトリ
-    const geometry = new THREE.CylinderGeometry(radius, radius, height, segments);
-    
-    // プレイヤーとCPUで異なるマテリアル（盤面と同じ）
-    const material = isPlayer ?
-      new THREE.MeshPhysicalMaterial({
-        color: 0x111111,
-        metalness: 0.15,  // 0.1から0.15に変更
-        roughness: 0.15,  // 0.2から0.15に変更でより艶やかに
-        reflectivity: 0.6, // 0.5から0.6に変更
-        clearcoat: 0.4,    // 0.3から0.4に変更
-        clearcoatRoughness: 0.15 // 0.2から0.15に変更
-      }) :
-      new THREE.MeshPhysicalMaterial({
-        color: 0xf5f5f5,  // より純白に
-        metalness: 0.12,  // 0.1から0.12に変更
-        roughness: 0.25,  // 0.3から0.25に変更
-        reflectivity: 0.8, // 0.7から0.8に変更
-        clearcoat: 0.6,    // 0.5から0.6に変更
-        clearcoatRoughness: 0.08 // 0.1から0.08に変更
-      });
-    
-    const piece = new THREE.Mesh(geometry, material);
-    // 影の設定を追加
-    piece.castShadow = true;
-    piece.receiveShadow = true;
-    
-    // 配置位置の計算
-    let positionIndex;
-    if (isPlayer) {
-      // プレイヤーは左から減る（0が一番左、31が一番右）
-      positionIndex = i;
-    } else {
-      // CPUは右から減る（0が一番右、31が一番左）
-      positionIndex = maxPieces - remainingPieces + i;
-    }
-    
-    // 実際の位置を計算
-    const offsetX = startX + positionIndex * spacing;
-    
-    // Z方向は中央に配置
-    const offsetZ = 0;
-    
-    // すべての駒を同じ高さに配置
-    const offsetY = 0.013;
-    
-    piece.position.set(offsetX, offsetY, offsetZ);
-    
-    // 駒を正しく向ける（円柱の側面がプレイヤーを向くように）
-    piece.rotation.z = Math.PI / 2;  // Z軸周りに90度回転
-    
-    pieceCase.add(piece);
-    displayedPieces.push(piece);
-  }
-}
-
-// 持ち駒ケースを初期化する関数
-function initPieceCases() {
-  // 既存のケースがあれば削除
-  if (playerPieceCase) {
-    board.remove(playerPieceCase);
-  }
-  
-  if (cpuPieceCase) {
-    board.remove(cpuPieceCase);
-  }
-  
-  // 持ち駒数をリセット
-  playerRemainingPieces = MAX_PIECES;
-  cpuRemainingPieces = MAX_PIECES;
-  
-  // プレイヤーの持ち駒トレイを作成・配置
-  playerPieceCase = createPieceCase(true);
-  playerPieceCase.position.set(0, 0.01, 0.3); // 盤面の手前端に接するように
-  playerPieceCase.rotation.y = 0; // まっすぐ配置
-  board.add(playerPieceCase);
-  
-  // CPUの持ち駒トレイを作成・配置
-  cpuPieceCase = createPieceCase(false);
-  cpuPieceCase.position.set(0, 0.01, -0.3); // 盤面の奥側端に接するように
-  cpuPieceCase.rotation.y = 0; // まっすぐ配置
-  board.add(cpuPieceCase);
-  
-  // 表示を初期化
-  displayedPlayerPieces = [];
-  displayedCpuPieces = [];
-  
-  // 持ち駒の表示を更新
-  updatePieceCaseDisplay(true);
-  updatePieceCaseDisplay(false);
-}
-
-// ページ読み込み時に初期化を呼び出し
-init();
-
-// 花火の音再生関数
-function playFireworkSound() {
-  if (!listener || !listener.context) {
-    console.warn('Audio listener not initialized');
     return;
   }
   
-  // 花火音を切るタイマーを設定（10秒後に停止）
-  if (window.fireworkSoundTimeout) {
-    clearTimeout(window.fireworkSoundTimeout);
+  // 難易度選択メニューの操作
+  if (difficultyMenu && !difficultySelected) {
+    const controller = event.target;
+    const raycaster = new THREE.Raycaster();
+    const tempMatrix = new THREE.Matrix4();
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+    
+    // 難易度ボタンとの交差判定
+    difficultyMenu.children.forEach(child => {
+      if (child.userData && child.userData.type === 'button') {
+        const intersects = raycaster.intersectObject(child);
+        
+        if (intersects.length > 0) {
+          // 難易度が選択された
+          difficultyLevel = child.userData.value;
+          difficultySelected = true;
+          scene.remove(difficultyMenu);
+          playSound('select');
+          
+          // 難易度に応じた設定を行う
+          setupGame();
+          return;
+        }
+      }
+    });
   }
   
-  window.fireworkSoundTimeout = setTimeout(() => {
-    if (window.fireworksActive) {
-      // 10秒後に音を止めるが、花火は継続
-      console.log('花火音を停止しますが、視覚効果は継続します');
+  // ゲーム内の操作（駒を置く）
+  if (gameStarted && isPlayerTurn && !isProcessingMove) {
+    // 最後のselectイベントからの経過時間を計算
+    const currentTime = performance.now();
+    const timeSinceLastSelect = currentTime - lastSelectTime;
+    
+    // 連続したselectイベントの間隔が短すぎる場合は無視
+    if (timeSinceLastSelect < 500) {
+      return;
     }
-  }, 10000); // 10秒後に音を止める
+    
+    lastSelectTime = currentTime;
+    
+    // コントローラーを使ってボード上の位置を特定
+    const controller = event.target;
+    const raycaster = new THREE.Raycaster();
+    const tempMatrix = new THREE.Matrix4();
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+    
+    // ボードとの交差判定
+    if (boardBase) {
+      const intersects = raycaster.intersectObject(boardBase);
+      
+      if (intersects.length > 0) {
+        // 交差点の位置をボードの座標系に変換
+        const point = intersects[0].point;
+        const localPoint = board.worldToLocal(point.clone());
+        
+        // ボードの座標を行と列に変換
+        const col = Math.floor((localPoint.x + 0.25) / 0.0625);
+        const row = Math.floor((localPoint.z + 0.25) / 0.0625);
+        
+        // 有効範囲内かつ有効な手かどうかをチェック
+        if (row >= 0 && row < 8 && col >= 0 && col < 8 && isValidMove(row, col, currentPlayer)) {
+          // 駒を置く
+          placePiece(row, col, currentPlayer, controller);
+          
+          // プレイヤーのターン終了
+          endPlayerTurn();
+        }
+      }
+    }
+  }
 }
 
-// ランダムな花火の音を再生
-function playRandomFireworkSound() {
-  if (!listener || !listener.context || !window.fireworksActive) return;
+// -------------------------------
+// プレイヤーのターン終了処理
+// -------------------------------
+function endPlayerTurn() {
+  isPlayerTurn = false;
   
-  // 花火の音が停止状態なら何もしない（10秒のタイムアウト後）
-  if (!window.fireworkSoundTimeout) return;
+  // 有効手マーカーをクリア
+  clearValidMoveMarkers();
   
-  const context = listener.context;
+  // ゲーム状態の更新
+  updateGameState();
   
-  // 各種花火音のバリエーション
-  const soundType = Math.floor(Math.random() * 3);
-  const volume = 0.15; // 音量を控えめに
-  
-  // ゲインノード
-  const gainNode = context.createGain();
-  gainNode.connect(context.destination);
-  gainNode.gain.value = volume;
-  
-  // ノイズ発生器（ホワイトノイズ）
-  const bufferSize = context.sampleRate * 0.5; // 0.5秒分
-  const buffer = context.createBuffer(1, bufferSize, context.sampleRate);
-  const data = buffer.getChannelData(0);
-  
-  // ノイズ生成
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1;
-  }
-  
-  // ノイズソース
-  const noise = context.createBufferSource();
-  noise.buffer = buffer;
-  
-  // フィルター
-  const filter = context.createBiquadFilter();
-  filter.type = 'bandpass';
-  
-  switch (soundType) {
-    case 0: // 打ち上げ音
-      filter.frequency.value = 500;
-      filter.Q.value = 1;
-      
-      // 音量エンベロープ
-      gainNode.gain.setValueAtTime(0, context.currentTime);
-      gainNode.gain.linearRampToValueAtTime(volume, context.currentTime + 0.05);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.3);
-      
-      // 再生時間
-      noise.start();
-      noise.stop(context.currentTime + 0.3);
-      break;
-      
-    case 1: // 爆発音（短め）
-      filter.frequency.value = 800;
-      filter.Q.value = 0.7;
-      
-      // 音量エンベロープ
-      gainNode.gain.setValueAtTime(0, context.currentTime);
-      gainNode.gain.linearRampToValueAtTime(volume, context.currentTime + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.2);
-      
-      // 再生時間
-      noise.start();
-      noise.stop(context.currentTime + 0.2);
-      break;
-      
-    case 2: // 大きな爆発音
-      filter.frequency.value = 300;
-      filter.Q.value = 0.5;
-      
-      // 音量エンベロープ
-      gainNode.gain.setValueAtTime(0, context.currentTime);
-      gainNode.gain.linearRampToValueAtTime(volume, context.currentTime + 0.02);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.5);
-      
-      // 再生時間
-      noise.start();
-      noise.stop(context.currentTime + 0.5);
-      break;
-  }
-  
-  // 接続
-  noise.connect(filter);
-  filter.connect(gainNode);
+  // CPUのターンを開始
+  setTimeout(() => {
+    if (!isPlayerTurn) {
+      startCPUTurn();
+    }
+  }, 1000);
 }
 
+// -------------------------------
+// ゲーム状態の更新
+// -------------------------------
+function updateGameState() {
+  // ゲーム終了判定
+  const blackCount = countPieces(1);
+  const whiteCount = countPieces(-1);
+  const emptyCount = 64 - blackCount - whiteCount;
+  
+  if (emptyCount === 0) {
+    // 盤面が埋まった場合
+    gameOver(blackCount, whiteCount);
+  } else {
+    // 次のプレイヤーが打てるかチェック
+    const nextPlayer = -currentPlayer;
+    const canNextPlayerMove = checkPlayerCanMove(nextPlayer);
+    
+    if (!canNextPlayerMove) {
+      // 次のプレイヤーが打てない場合
+      const canCurrentPlayerMove = checkPlayerCanMove(currentPlayer);
+      
+      if (!canCurrentPlayerMove) {
+        // 両者とも打てない場合はゲーム終了
+        gameOver(blackCount, whiteCount);
+      } else {
+        // 現在のプレイヤーがそのまま続行
+        currentPlayer = currentPlayer;
+        isPlayerTurn = currentPlayer === 1;
+        
+        if (isPlayerTurn) {
+          updateGameMessage('相手の打てる場所がないため、あなたの番が続きます');
+          showValidMoves(currentPlayer);
+        } else {
+          updateGameMessage('あなたの打てる場所がないため、相手の番が続きます');
+          startCPUTurn();
+        }
+      }
+    } else {
+      // 通常の交代
+      currentPlayer = nextPlayer;
+      isPlayerTurn = currentPlayer === 1;
+      
+      if (isPlayerTurn) {
+        updateGameMessage('あなたの番です（黒）');
+        showValidMoves(currentPlayer);
+      } else {
+        updateGameMessage('相手の番です（白）');
+      }
+    }
+  }
+}
+
+// -------------------------------
+// 駒の数を数える関数
+// -------------------------------
+function countPieces(player) {
+  let count = 0;
+  
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      if (boardState[row][col] === player) {
+        count++;
+      }
+    }
+  }
+  
+  return count;
+}
+
+// -------------------------------
+// プレイヤーが駒を置ける場所があるかチェックする関数
+// -------------------------------
+function checkPlayerCanMove(player) {
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      if (isValidMove(row, col, player)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+// -------------------------------
+// ゲーム終了処理
+// -------------------------------
+function gameOver(blackCount, whiteCount) {
+  // ゲーム結果の表示
+  let resultMessage;
+  
+  if (blackCount > whiteCount) {
+    resultMessage = `あなたの勝ち！ ${blackCount}-${whiteCount}`;
+    playerWins++;
+    playSound('win');
+  } else if (whiteCount > blackCount) {
+    resultMessage = `あなたの負け ${blackCount}-${whiteCount}`;
+    cpuWins++;
+    playSound('lose');
+  } else {
+    resultMessage = `引き分け ${blackCount}-${whiteCount}`;
+    draws++;
+  }
+  
+  updateGameMessage(resultMessage);
+  
+  // ゲーム再開のためのリセット
+  setTimeout(() => {
+    resetGame();
+  }, 5000);
+}
+
+// -------------------------------
+// ゲームのリセット
+// -------------------------------
+function resetGame() {
+  // ボード状態をリセット
+  initBoardState();
+  
+  // 駒をクリア
+  while (pieces.length > 0) {
+    const piece = pieces.pop();
+    board.remove(piece);
+  }
+  
+  // ゲーム状態をリセット
+  currentPlayer = 1;
+  isPlayerTurn = true;
+  gameStarted = true;
+  
+  // 初期配置
+  placePiece(3, 4, 1);
+  placePiece(4, 3, 1);
+  placePiece(3, 3, -1);
+  placePiece(4, 4, -1);
+  
+  // 持ち駒をリセット
+  playerRemainingPieces = MAX_PIECES - 2;
+  cpuRemainingPieces = MAX_PIECES - 2;
+  updatePieceCaseDisplay(true);
+  updatePieceCaseDisplay(false);
+  
+  // 有効手を表示
+  showValidMoves(currentPlayer);
+  
+  // メッセージを更新
+  updateGameMessage('あなたの番です（黒）');
+}
+
+// -------------------------------
+// CPUのターン開始
+// -------------------------------
+function startCPUTurn() {
+  if (isPlayerTurn) return;
+  
+  // 簡単なAIによる手の選択
+  setTimeout(() => {
+    const move = selectCPUMove();
+    
+    if (move) {
+      placePiece(move.row, move.col, -1);
+      
+      // CPUのターン終了
+      endCPUTurn();
+    } else {
+      // 打てる場所がない場合
+      updateGameMessage('CPUの打てる場所がありません');
+      
+      // プレイヤーのターンに戻る
+      endCPUTurn();
+    }
+  }, 1500);
+}
+
+// -------------------------------
+// CPUのターン終了
+// -------------------------------
+function endCPUTurn() {
+  isPlayerTurn = true;
+  
+  // ゲーム状態の更新
+  updateGameState();
+}
+
+// -------------------------------
+// CPUの手を選択する関数
+// -------------------------------
+function selectCPUMove() {
+  // 有効な手を集める
+  const validMoves = [];
+  
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      if (isValidMove(row, col, -1)) {
+        validMoves.push({ row, col });
+      }
+    }
+  }
+  
+  if (validMoves.length === 0) {
+    return null;
+  }
+  
+  // 難易度に応じた手の選択
+  if (difficultyLevel === 'easy') {
+    // 簡単：ランダムに選択
+    return validMoves[Math.floor(Math.random() * validMoves.length)];
+  } else if (difficultyLevel === 'hard') {
+    // 難しい：評価関数に基づいて選択
+    return getBestMove(validMoves);
+  } else {
+    // 中級：80%の確率で最適な手、20%の確率でランダム
+    if (Math.random() < 0.8) {
+      return getBestMove(validMoves);
+    } else {
+      return validMoves[Math.floor(Math.random() * validMoves.length)];
+    }
+  }
+}
+
+// -------------------------------
+// 最適な手を選択する関数
+// -------------------------------
+function getBestMove(validMoves) {
+  // 簡易的な評価関数：隅を優先
+  const corners = [
+    {row: 0, col: 0},
+    {row: 0, col: 7},
+    {row: 7, col: 0},
+    {row: 7, col: 7}
+  ];
+  
+  // 隅に置ける場合は置く
+  for (const move of validMoves) {
+    for (const corner of corners) {
+      if (move.row === corner.row && move.col === corner.col) {
+        return move;
+      }
+    }
+  }
+  
+  // 端の方が良い
+  const edgeMoves = validMoves.filter(move => 
+    move.row === 0 || move.row === 7 || move.col === 0 || move.col === 7
+  );
+  
+  if (edgeMoves.length > 0) {
+    return edgeMoves[Math.floor(Math.random() * edgeMoves.length)];
+  }
+  
+  // それ以外はランダム
+  return validMoves[Math.floor(Math.random() * validMoves.length)];
+}
+
+// -------------------------------
+// ゲームのセットアップ
+// -------------------------------
+function setupGame() {
+  // オセロ盤を表示
+  board.visible = true;
+  
+  // ゲーム状態の初期化
+  initBoardState();
+  
+  // 駒をクリア
+  while (pieces.length > 0) {
+    const piece = pieces.pop();
+    board.remove(piece);
+  }
+  
+  // ゲーム状態をリセット
+  currentPlayer = 1;
+  isPlayerTurn = true;
+  gameStarted = false; // まだHitTestで配置する必要あり
+}
+
+// -------------------------------
+// コントローラーのsqueezestart（グリップ）イベント処理関数
+// -------------------------------
+function onSqueezeStart(event) {
+  const controller = event.target;
+  const index = controllers.indexOf(controller);
+  
+  if (index !== -1) {
+    isGripping[index] = true;
+    
+    // コントローラーの初期位置を保存
+    controllerInitialPositions[index].copy(controller.position);
+    
+    // ボードの初期位置を保存
+    if (board) {
+      boardInitialPosition.copy(board.position);
+    }
+  }
+}
+
+// -------------------------------
+// コントローラーのsqueezeend（グリップ解除）イベント処理関数
+// -------------------------------
+function onSqueezeEnd(event) {
+  const controller = event.target;
+  const index = controllers.indexOf(controller);
+  
+  if (index !== -1) {
+    isGripping[index] = false;
+  }
+}
+
+// -------------------------------
+// グリップ操作によるボードの移動処理
+// -------------------------------
+function updateBoardPosition() {
+  if (!board || !gameStarted) return;
+  
+  let isAnyGripping = false;
+  
+  controllers.forEach((controller, index) => {
+    if (isGripping[index]) {
+      isAnyGripping = true;
+      
+      // コントローラーの移動量を計算
+      const currentPosition = new THREE.Vector3();
+      controller.getWorldPosition(currentPosition);
+      
+      const delta = new THREE.Vector3().subVectors(
+        currentPosition,
+        controllerInitialPositions[index]
+      );
+      
+      // ボードの位置を更新
+      board.position.copy(boardInitialPosition.clone().add(delta));
+    }
+  });
+  
+  // グリップ中は線の色を変更
+  controllers.forEach((controller, index) => {
+    controller.children.forEach(child => {
+      if (child.name === 'controller-line') {
+        child.material.color.set(isGripping[index] ? 0xff0000 : 0x4b6cb7);
+      }
+    });
+  });
+}
+
+// renderFrame関数を更新してボード位置の更新を含める
 function renderFrame(time, frame) {
   time *= 0.001; // ミリ秒を秒に変換
   const deltaTime = Math.min(0.05, clock.getDelta()) * DELTA_MULTIPLIER; // デルタ時間
@@ -1018,6 +927,9 @@ function renderFrame(time, frame) {
       if (exitButton) {
         updateExitButton(frame);
       }
+      
+      // グリップ操作によるボード位置の更新
+      updateBoardPosition();
       
       const referenceSpace = xrReferenceSpace;
       if (xrHitTestSource && !gameStarted) {
@@ -1203,3 +1115,1011 @@ function renderFrame(time, frame) {
   
   renderer.render(scene, camera);
 }
+
+// -------------------------------
+// WebXR終了ボタンを作成する関数
+// -------------------------------
+function createExitButton() {
+  const exitButtonGroup = new THREE.Group();
+  
+  // 背景となる半透明の丸い板
+  const bgGeometry = new THREE.CircleGeometry(0.05, 32);
+  const bgMaterial = new THREE.MeshBasicMaterial({
+    color: 0x333333,
+    transparent: true,
+    opacity: 0.7,
+    side: THREE.DoubleSide
+  });
+  const bg = new THREE.Mesh(bgGeometry, bgMaterial);
+  bg.rotation.x = -Math.PI / 2;
+  exitButtonGroup.add(bg);
+  
+  // 戻るアイコン（×印）
+  const iconGeometry = new THREE.BufferGeometry();
+  const points = [
+    // X印の左上から右下
+    new THREE.Vector3(-0.025, 0.001, -0.025),
+    new THREE.Vector3(0.025, 0.001, 0.025),
+    // X印の右上から左下
+    new THREE.Vector3(0.025, 0.001, -0.025),
+    new THREE.Vector3(-0.025, 0.001, 0.025)
+  ];
+  iconGeometry.setFromPoints(points);
+  const iconMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 3 });
+  const icon = new THREE.LineSegments(iconGeometry, iconMaterial);
+  exitButtonGroup.add(icon);
+  
+  // ボタンにユーザーデータを設定
+  exitButtonGroup.userData = {
+    type: 'exit-button',
+    hovering: false
+  };
+  
+  // 常にカメラの左上に表示されるように設定
+  exitButtonGroup.position.set(-0.15, 0.15, -0.3);
+  exitButtonGroup.userData.faceCamera = true;
+  
+  return exitButtonGroup;
+}
+
+// -------------------------------
+// WebXR終了ボタンを更新する関数
+// -------------------------------
+function updateExitButton(frame) {
+  if (!exitButton) return;
+  
+  // カメラに対して常に正面を向くように
+  if (exitButton.userData.faceCamera && camera) {
+    // カメラの位置を取得
+    const cameraWorldPosition = new THREE.Vector3();
+    camera.getWorldPosition(cameraWorldPosition);
+    
+    // ボタンをカメラの前に配置（左上）
+    exitButton.position.copy(cameraWorldPosition);
+    
+    // カメラの向きを取得
+    const cameraWorldDirection = new THREE.Vector3();
+    camera.getWorldDirection(cameraWorldDirection);
+    
+    // カメラの右と上のベクトルを計算
+    const cameraRight = new THREE.Vector3();
+    const cameraUp = new THREE.Vector3(0, 1, 0);
+    cameraRight.crossVectors(cameraWorldDirection, cameraUp).normalize();
+    cameraUp.crossVectors(cameraRight, cameraWorldDirection).normalize();
+    
+    // カメラの前方に移動し、左上に配置
+    exitButton.position.addScaledVector(cameraWorldDirection, -0.3);
+    exitButton.position.addScaledVector(cameraRight, -0.15);
+    exitButton.position.addScaledVector(cameraUp, 0.15);
+    
+    // カメラに向ける
+    exitButton.lookAt(cameraWorldPosition);
+  }
+  
+  // コントローラーとの交差判定
+  controllers.forEach(controller => {
+    // コントローラーのレイを表す
+    const raycaster = new THREE.Raycaster();
+    const tempMatrix = new THREE.Matrix4();
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+    
+    // 終了ボタンとの交差判定
+    const intersects = raycaster.intersectObject(exitButton.children[0], true);
+    
+    if (intersects.length > 0) {
+      // ホバー中は少し拡大
+      if (!exitButton.userData.hovering) {
+        exitButton.userData.hovering = true;
+        exitButton.scale.set(1.2, 1.2, 1.2);
+        exitButton.children[0].material.color.set(0x4b6cb7);
+      }
+    } else if (exitButton.userData.hovering) {
+      // ホバー解除で元に戻す
+      exitButton.userData.hovering = false;
+      exitButton.scale.set(1.0, 1.0, 1.0);
+      exitButton.children[0].material.color.set(0x333333);
+    }
+  });
+}
+
+// -------------------------------
+// 初期化関数
+// -------------------------------
+function init() {
+  // シーンの作成
+  scene = new THREE.Scene();
+  
+  // カメラの作成
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 1.6, 3);
+  
+  // レンダラーの作成
+  renderer = new THREE.WebGLRenderer({ 
+    antialias: true,
+    alpha: true,
+    canvas: document.getElementById('canvas')
+  });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  
+  // 環境光
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+  scene.add(ambientLight);
+  
+  // 平行光源
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  directionalLight.position.set(1, 2, 1);
+  scene.add(directionalLight);
+  
+  // オセロ盤の作成（初期状態は非表示）
+  createBoard();
+  board.visible = false;
+  scene.add(board);
+  
+  // ゲーム状態の初期化
+  initBoardState();
+  
+  // ウィンドウのリサイズイベントリスナーを登録
+  window.addEventListener('resize', onWindowResize);
+  
+  // WebXRのサポート状況を確認
+  checkWebXRSupport();
+  
+  // スタートボタンのイベントリスナーを登録
+  document.getElementById('startButton').addEventListener('click', startXRSession);
+}
+
+// -------------------------------
+// ウィンドウのリサイズに応じてカメラとレンダラーを更新する関数
+// -------------------------------
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// -------------------------------
+// WebXRのサポート状況を確認する関数
+// -------------------------------
+function checkWebXRSupport() {
+  const deviceMessage = document.getElementById('device-message');
+  
+  if (navigator.xr) {
+    navigator.xr.isSessionSupported('immersive-ar')
+      .then(supported => {
+        if (supported) {
+          deviceMessage.textContent = 'WebXR ARがサポートされています！';
+          document.getElementById('startButton').disabled = false;
+        } else {
+          deviceMessage.textContent = 'WebXR ARはサポートされていませんが、VRは利用可能かもしれません';
+          document.getElementById('startButton').disabled = true;
+        }
+      })
+      .catch(err => {
+        deviceMessage.textContent = 'WebXRの確認中にエラーが発生しました: ' + err;
+        document.getElementById('startButton').disabled = true;
+      });
+  } else {
+    deviceMessage.textContent = 'WebXRはお使いのブラウザでサポートされていません';
+    document.getElementById('startButton').disabled = true;
+  }
+}
+
+// -------------------------------
+// ゲームボードの状態を初期化する関数
+// -------------------------------
+function initBoardState() {
+  boardState = Array(8).fill().map(() => Array(8).fill(0));
+}
+
+// -------------------------------
+// オセロ盤を作成する関数
+// -------------------------------
+function createBoard() {
+  board = new THREE.Group();
+  
+  // 盤面の基本設定
+  const boardWidth = 0.5;
+  const boardHeight = 0.02;
+  const boardDepth = 0.5;
+  
+  // 盤面の木目調テクスチャを作成
+  const boardTexture = createWoodTexture();
+  
+  // 盤面のマテリアル
+  const boardMaterial = new THREE.MeshStandardMaterial({
+    map: boardTexture,
+    roughness: 0.5,
+    metalness: 0.1
+  });
+  
+  // 盤面のジオメトリ
+  const boardGeometry = new THREE.BoxGeometry(boardWidth, boardHeight, boardDepth);
+  
+  // 盤面のメッシュ
+  boardBase = new THREE.Mesh(boardGeometry, boardMaterial);
+  boardBase.receiveShadow = true;
+  boardBase.name = 'board-base';
+  board.add(boardBase);
+  
+  // グリッド線と駒の位置を追加
+  addGridAndPositions();
+  
+  // 盤面カーソルを作成
+  createBoardCursor();
+  
+  // 持ち駒ケースを作成
+  initPieceCases();
+  
+  // ステータス表示を作成
+  createStatusDisplay();
+  
+  return board;
+}
+
+// -------------------------------
+// 木目調テクスチャを作成する関数
+// -------------------------------
+function createWoodTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  
+  // 下地の色（濃い茶色）
+  ctx.fillStyle = '#3d2b1f';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 木目のパターンを描画
+  ctx.strokeStyle = '#4d3423';
+  ctx.lineWidth = 2;
+  
+  // ランダムな木目を描画
+  for (let i = 0; i < 40; i++) {
+    ctx.beginPath();
+    const startX = Math.random() * canvas.width;
+    const startY = Math.random() * canvas.height;
+    ctx.moveTo(startX, startY);
+    
+    // 曲線を描画
+    const cp1x = startX + 100 + Math.random() * 100;
+    const cp1y = startY + (Math.random() - 0.5) * 200;
+    const cp2x = startX + 200 + Math.random() * 100;
+    const cp2y = startY + (Math.random() - 0.5) * 200;
+    const endX = startX + 300 + Math.random() * 100;
+    const endY = startY + (Math.random() - 0.5) * 200;
+    
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+    ctx.stroke();
+  }
+  
+  // グリッド線の描画（8x8）
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 4;
+  
+  // 縦線
+  for (let i = 1; i < 8; i++) {
+    const x = i * (canvas.width / 8);
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  
+  // 横線
+  for (let i = 1; i < 8; i++) {
+    const y = i * (canvas.height / 8);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+}
+
+// -------------------------------
+// グリッド線と駒の位置を追加する関数
+// -------------------------------
+function addGridAndPositions() {
+  // この関数はテクスチャで代替されるため、実装は省略
+}
+
+// -------------------------------
+// 盤面カーソルを作成する関数
+// -------------------------------
+function createBoardCursor() {
+  const cursorGeometry = new THREE.RingGeometry(0.025, 0.028, 32);
+  const cursorMaterial = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.8
+  });
+  
+  boardCursor = new THREE.Mesh(cursorGeometry, cursorMaterial);
+  boardCursor.rotation.x = -Math.PI / 2;
+  boardCursor.position.y = 0.001;
+  boardCursor.visible = false;
+  boardCursor.renderOrder = 50;
+  board.add(boardCursor);
+}
+
+// -------------------------------
+// ステータス表示を作成する関数
+// -------------------------------
+function createStatusDisplay() {
+  statusDisplay = new THREE.Group();
+  statusDisplay.position.set(0, 0.25, 0);
+  statusDisplay.visible = false;
+  
+  // ステータス背景
+  const statusBgGeometry = new THREE.PlaneGeometry(0.4, 0.08);
+  const statusBgMaterial = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.7,
+    side: THREE.DoubleSide
+  });
+  
+  const statusBg = new THREE.Mesh(statusBgGeometry, statusBgMaterial);
+  statusBg.position.set(0, 0, 0);
+  statusDisplay.add(statusBg);
+  
+  // テキスト表示用のキャンバステクスチャ
+  const canvas = document.createElement('canvas');
+  canvas.width = 400;
+  canvas.height = 80;
+  const ctx = canvas.getContext('2d');
+  
+  // テキストの設定
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 32px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('あなたの番です', canvas.width / 2, canvas.height / 2);
+  
+  // テクスチャを作成
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  
+  // テキスト表示用のメッシュ
+  const textGeometry = new THREE.PlaneGeometry(0.38, 0.076);
+  const textMaterial = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    side: THREE.DoubleSide
+  });
+  
+  const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+  textMesh.position.set(0, 0, 0.001);
+  statusDisplay.add(textMesh);
+  
+  // キャンバスとコンテキストを保存（テキスト更新用）
+  statusDisplay.userData = {
+    canvas: canvas,
+    context: ctx,
+    texture: texture
+  };
+  
+  board.add(statusDisplay);
+}
+
+// -------------------------------
+// ステータス表示のテキストを更新する関数
+// -------------------------------
+function updateGameMessage(message) {
+  if (!statusDisplay) return;
+  
+  const { canvas, context, texture } = statusDisplay.userData;
+  
+  // キャンバスをクリア
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // テキストの設定
+  context.fillStyle = 'white';
+  context.font = 'bold 32px Arial';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(message, canvas.width / 2, canvas.height / 2);
+  
+  // テクスチャを更新
+  texture.needsUpdate = true;
+}
+
+// -------------------------------
+// ステータス表示を更新する関数
+// -------------------------------
+function updateStatusDisplay(deltaTime) {
+  if (!statusDisplay) return;
+  
+  // カメラの方向に向ける
+  const cameraWorldPosition = new THREE.Vector3();
+  camera.getWorldPosition(cameraWorldPosition);
+  
+  // statusDisplayのワールド座標を取得
+  const statusWorldPosition = new THREE.Vector3();
+  statusDisplay.getWorldPosition(statusWorldPosition);
+  
+  // カメラとの方向ベクトルを計算
+  const dirToCamera = new THREE.Vector3().subVectors(cameraWorldPosition, statusWorldPosition);
+  dirToCamera.y = 0; // Y軸回転のみ
+  
+  if (dirToCamera.length() > 0.001) {
+    statusDisplay.lookAt(
+      statusWorldPosition.x + dirToCamera.x,
+      statusWorldPosition.y,
+      statusWorldPosition.z + dirToCamera.z
+    );
+  }
+}
+
+// -------------------------------
+// パーティクルシステムを作成する関数
+// -------------------------------
+function createParticleSystem() {
+  // 簡易的なパーティクルシステム
+  const particleCount = 100;
+  const particleGeometry = new THREE.BufferGeometry();
+  const particlePositions = new Float32Array(particleCount * 3);
+  
+  for (let i = 0; i < particleCount * 3; i += 3) {
+    particlePositions[i] = (Math.random() - 0.5) * 0.5;
+    particlePositions[i + 1] = Math.random() * 0.2 + 0.05;
+    particlePositions[i + 2] = (Math.random() - 0.5) * 0.5;
+  }
+  
+  particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+  
+  const particleMaterial = new THREE.PointsMaterial({
+    color: 0x88ccff,
+    size: 0.01,
+    transparent: true,
+    opacity: 0.7
+  });
+  
+  const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+  particleSystem.userData = {
+    velocities: Array(particleCount).fill().map(() => new THREE.Vector3(
+      (Math.random() - 0.5) * 0.01,
+      Math.random() * 0.01,
+      (Math.random() - 0.5) * 0.01
+    )),
+    lifetimes: Array(particleCount).fill().map(() => Math.random() * 2 + 1),
+    ages: Array(particleCount).fill(0)
+  };
+  
+  particles.push(particleSystem);
+  scene.add(particleSystem);
+  
+  return particleSystem;
+}
+
+// -------------------------------
+// パーティクルシステムを更新する関数
+// -------------------------------
+function updateParticles(deltaTime) {
+  particles.forEach((particleSystem, systemIndex) => {
+    const positions = particleSystem.geometry.attributes.position.array;
+    const velocities = particleSystem.userData.velocities;
+    const lifetimes = particleSystem.userData.lifetimes;
+    const ages = particleSystem.userData.ages;
+    
+    let allDead = true;
+    
+    for (let i = 0; i < positions.length / 3; i++) {
+      if (ages[i] < lifetimes[i]) {
+        // 粒子がまだ生きている
+        allDead = false;
+        ages[i] += deltaTime;
+        
+        // 位置を更新
+        positions[i * 3] += velocities[i].x * deltaTime;
+        positions[i * 3 + 1] += velocities[i].y * deltaTime;
+        positions[i * 3 + 2] += velocities[i].z * deltaTime;
+        
+        // 重力の影響
+        velocities[i].y -= 0.001 * deltaTime;
+      } else {
+        // 粒子の寿命が尽きたらリセット
+        positions[i * 3] = (Math.random() - 0.5) * 0.5;
+        positions[i * 3 + 1] = Math.random() * 0.2 + 0.05;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
+        
+        velocities[i].set(
+          (Math.random() - 0.5) * 0.01,
+          Math.random() * 0.01,
+          (Math.random() - 0.5) * 0.01
+        );
+        
+        ages[i] = 0;
+        lifetimes[i] = Math.random() * 2 + 1;
+      }
+    }
+    
+    // ジオメトリを更新
+    particleSystem.geometry.attributes.position.needsUpdate = true;
+    
+    // すべての粒子が寿命を迎えた場合、パーティクルシステムを削除
+    if (allDead) {
+      scene.remove(particleSystem);
+      particles.splice(systemIndex, 1);
+    }
+  });
+}
+
+// -------------------------------
+// ウェルカムパーティクルを作成する関数
+// -------------------------------
+function createWelcomeParticles() {
+  const particleCount = 30;
+  const particleGeometry = new THREE.BufferGeometry();
+  const particlePositions = new Float32Array(particleCount * 3);
+  
+  for (let i = 0; i < particleCount * 3; i += 3) {
+    particlePositions[i] = (Math.random() - 0.5) * 0.2;
+    particlePositions[i + 1] = (Math.random() - 0.5) * 0.2;
+    particlePositions[i + 2] = (Math.random() - 0.5) * 0.2;
+  }
+  
+  particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+  
+  const particleMaterial = new THREE.PointsMaterial({
+    color: 0xffcc88,
+    size: 0.015,
+    transparent: true,
+    opacity: 0.8
+  });
+  
+  const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+  particleSystem.userData = {
+    velocities: Array(particleCount).fill().map(() => new THREE.Vector3(
+      (Math.random() - 0.5) * 0.005,
+      (Math.random() - 0.5) * 0.005,
+      (Math.random() - 0.5) * 0.005
+    ))
+  };
+  
+  return particleSystem;
+}
+
+// -------------------------------
+// ウェルカムパーティクルを更新する関数
+// -------------------------------
+function updateWelcomeParticles(deltaTime) {
+  welcomeParticles.forEach((particleSystem, systemIndex) => {
+    const positions = particleSystem.geometry.attributes.position.array;
+    const velocities = particleSystem.userData.velocities;
+    
+    for (let i = 0; i < positions.length / 3; i++) {
+      // 位置を更新
+      positions[i * 3] += velocities[i].x * deltaTime;
+      positions[i * 3 + 1] += velocities[i].y * deltaTime;
+      positions[i * 3 + 2] += velocities[i].z * deltaTime;
+      
+      // バウンダリ内に留める
+      if (Math.abs(positions[i * 3]) > 0.3) velocities[i].x *= -1;
+      if (Math.abs(positions[i * 3 + 1]) > 0.3) velocities[i].y *= -1;
+      if (Math.abs(positions[i * 3 + 2]) > 0.3) velocities[i].z *= -1;
+    }
+    
+    // ジオメトリを更新
+    particleSystem.geometry.attributes.position.needsUpdate = true;
+  });
+}
+
+// -------------------------------
+// 初期環境を配置する関数
+// -------------------------------
+function placeInitialEnvironment() {
+  // 難易度選択メニューを作成
+  difficultyMenu = createDifficultyMenu();
+  difficultyMenu.position.set(0, 1.3, -1.1);
+  difficultyMenu.userData.faceCamera = true;
+  scene.add(difficultyMenu);
+  difficultySelected = false;
+  
+  // ウェルカムパーティクルを追加
+  const welcomeParticle = createWelcomeParticles();
+  welcomeParticle.position.set(0, 1.3, -1.1);
+  scene.add(welcomeParticle);
+  welcomeParticles.push(welcomeParticle);
+  
+  // 効果音
+  playSound('start');
+}
+
+// -------------------------------
+// 難易度選択メニューを作成する関数
+// -------------------------------
+function createDifficultyMenu() {
+  const menuGroup = new THREE.Group();
+  
+  // メニュー背景
+  const menuBgGeometry = new THREE.PlaneGeometry(0.5, 0.3);
+  const menuBgMaterial = new THREE.MeshBasicMaterial({
+    color: 0x000033,
+    transparent: true,
+    opacity: 0.8,
+    side: THREE.DoubleSide
+  });
+  
+  const menuBg = new THREE.Mesh(menuBgGeometry, menuBgMaterial);
+  menuBg.name = 'menu-background';
+  menuGroup.add(menuBg);
+  
+  // メニュータイトル
+  const titleCanvas = document.createElement('canvas');
+  titleCanvas.width = 512;
+  titleCanvas.height = 128;
+  const titleCtx = titleCanvas.getContext('2d');
+  
+  titleCtx.fillStyle = 'white';
+  titleCtx.font = 'bold 40px Arial';
+  titleCtx.textAlign = 'center';
+  titleCtx.textBaseline = 'middle';
+  titleCtx.fillText('難易度を選択', titleCanvas.width / 2, titleCanvas.height / 2);
+  
+  const titleTexture = new THREE.CanvasTexture(titleCanvas);
+  const titleGeometry = new THREE.PlaneGeometry(0.4, 0.1);
+  const titleMaterial = new THREE.MeshBasicMaterial({
+    map: titleTexture,
+    transparent: true,
+    side: THREE.DoubleSide
+  });
+  
+  const titleMesh = new THREE.Mesh(titleGeometry, titleMaterial);
+  titleMesh.position.set(0, 0.08, 0.001);
+  menuGroup.add(titleMesh);
+  
+  // 難易度ボタン
+  const levels = [
+    { name: '初級', value: 'easy', y: 0 },
+    { name: '中級', value: 'medium', y: -0.06 },
+    { name: '上級', value: 'hard', y: -0.12 }
+  ];
+  
+  levels.forEach(level => {
+    const buttonCanvas = document.createElement('canvas');
+    buttonCanvas.width = 256;
+    buttonCanvas.height = 64;
+    const buttonCtx = buttonCanvas.getContext('2d');
+    
+    buttonCtx.fillStyle = level.value === 'medium' ? '#4b6cb7' : '#445566';
+    buttonCtx.fillRect(0, 0, buttonCanvas.width, buttonCanvas.height);
+    buttonCtx.strokeStyle = 'white';
+    buttonCtx.lineWidth = 2;
+    buttonCtx.strokeRect(2, 2, buttonCanvas.width - 4, buttonCanvas.height - 4);
+    
+    buttonCtx.fillStyle = 'white';
+    buttonCtx.font = 'bold 24px Arial';
+    buttonCtx.textAlign = 'center';
+    buttonCtx.textBaseline = 'middle';
+    buttonCtx.fillText(level.name, buttonCanvas.width / 2, buttonCanvas.height / 2);
+    
+    const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
+    const buttonGeometry = new THREE.PlaneGeometry(0.25, 0.05);
+    const buttonMaterial = new THREE.MeshBasicMaterial({
+      map: buttonTexture,
+      transparent: true,
+      side: THREE.DoubleSide
+    });
+    
+    const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
+    buttonMesh.position.set(0, level.y, 0.002);
+    buttonMesh.name = `difficulty-${level.value}`;
+    buttonMesh.userData = {
+      type: 'button',
+      value: level.value,
+      hovered: false
+    };
+    
+    menuGroup.add(buttonMesh);
+  });
+  
+  return menuGroup;
+}
+
+// -------------------------------
+// 難易度メニューを更新する関数
+// -------------------------------
+function updateDifficultyMenu(deltaTime) {
+  if (!difficultyMenu) return;
+  
+  // カメラの方向に向ける
+  if (difficultyMenu.userData.faceCamera) {
+    const cameraWorldPosition = new THREE.Vector3();
+    camera.getWorldPosition(cameraWorldPosition);
+    
+    const menuWorldPosition = new THREE.Vector3();
+    difficultyMenu.getWorldPosition(menuWorldPosition);
+    
+    const dirToCamera = new THREE.Vector3().subVectors(cameraWorldPosition, menuWorldPosition);
+    dirToCamera.y = 0; // Y軸回転のみ
+    
+    if (dirToCamera.length() > 0.001) {
+      difficultyMenu.lookAt(
+        menuWorldPosition.x + dirToCamera.x,
+        menuWorldPosition.y,
+        menuWorldPosition.z + dirToCamera.z
+      );
+    }
+  }
+  
+  // コントローラーとの交差判定
+  let menuInteracted = false;
+  
+  controllers.forEach(controller => {
+    if (menuInteracted) return;
+    
+    const raycaster = new THREE.Raycaster();
+    const tempMatrix = new THREE.Matrix4();
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+    
+    // メニュー内のボタンとの交差判定
+    difficultyMenu.children.forEach(child => {
+      if (child.userData && child.userData.type === 'button') {
+        const intersects = raycaster.intersectObject(child);
+        
+        if (intersects.length > 0) {
+          // ホバー効果
+          if (!child.userData.hovered) {
+            child.userData.hovered = true;
+            child.scale.set(1.1, 1.1, 1.1);
+          }
+          
+          // ボタン押下判定
+          controller.children.forEach(controllerChild => {
+            if (controllerChild.name === 'controller-line') {
+              controllerChild.material.color.set(0x00ff00);
+            }
+          });
+          
+          menuInteracted = true;
+        } else if (child.userData.hovered) {
+          child.userData.hovered = false;
+          child.scale.set(1.0, 1.0, 1.0);
+          
+          controller.children.forEach(controllerChild => {
+            if (controllerChild.name === 'controller-line') {
+              controllerChild.material.color.set(0x4b6cb7);
+            }
+          });
+        }
+      }
+    });
+  });
+}
+
+// -------------------------------
+// 駒を作成する関数
+// -------------------------------
+function createPiece(player) {
+  const radius = 0.028;
+  const height = 0.007;
+  const segments = 32;
+  
+  const geometry = new THREE.CylinderGeometry(radius, radius, height, segments);
+  
+  // 黒駒と白駒で異なるマテリアル
+  const material = player === 1 ?
+    new THREE.MeshPhysicalMaterial({
+      color: 0x111111,
+      metalness: 0.15,
+      roughness: 0.15,
+      reflectivity: 0.6,
+      clearcoat: 0.4,
+      clearcoatRoughness: 0.15
+    }) :
+    new THREE.MeshPhysicalMaterial({
+      color: 0xf5f5f5,
+      metalness: 0.12,
+      roughness: 0.25,
+      reflectivity: 0.8,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.08
+    });
+  
+  const piece = new THREE.Mesh(geometry, material);
+  piece.castShadow = true;
+  piece.receiveShadow = true;
+  
+  // ユーザーデータを設定
+  piece.userData = {
+    player: player
+  };
+  
+  return piece;
+}
+
+// -------------------------------
+// 駒を置く関数
+// -------------------------------
+function placePiece(row, col, player, controller = null) {
+  if (row < 0 || row >= 8 || col < 0 || col >= 8) return false;
+  
+  if (boardState[row][col] !== 0) {
+    // 既に駒が置かれている場所には置けない
+    return false;
+  }
+  
+  // 有効な手かどうかをチェック
+  if (player === 1 && !isValidMove(row, col, player)) {
+    return false;
+  }
+  
+  // 盤面の状態を更新
+  boardState[row][col] = player;
+  
+  // ボード上の位置を計算
+  const boardX = -0.25 + 0.03125 + (col * 0.0625);
+  const boardZ = -0.25 + 0.03125 + (row * 0.0625);
+  
+  // 駒を作成
+  const piece = createPiece(player);
+  piece.rotation.x = Math.PI / 2; // 駒を水平に寝かせる
+  piece.position.set(boardX, 0.02, boardZ);
+  
+  // 駒をボードに追加
+  board.add(piece);
+  pieces.push(piece);
+  
+  // 駒を置いた効果音再生
+  if (player === 1) {
+    playSound('placePlayer');
+    decreasePlayerPieces();
+  } else {
+    playSound('placeCPU');
+    decreaseCPUPieces();
+  }
+  
+  // ひっくり返せる駒を検出し、ひっくり返す
+  const flipped = flipPieces(row, col, player);
+  
+  return flipped.length > 0 || true;
+}
+
+// -------------------------------
+// 与えられた位置が有効な手かどうかをチェックする関数
+// -------------------------------
+function isValidMove(row, col, player) {
+  // 既に駒が置かれている場所には置けない
+  if (boardState[row][col] !== 0) {
+    return false;
+  }
+  
+  // 8方向をチェック
+  const directions = [
+    { dr: -1, dc: 0 },  // 上
+    { dr: 1, dc: 0 },   // 下
+    { dr: 0, dc: -1 },  // 左
+    { dr: 0, dc: 1 },   // 右
+    { dr: -1, dc: -1 }, // 左上
+    { dr: -1, dc: 1 },  // 右上
+    { dr: 1, dc: -1 },  // 左下
+    { dr: 1, dc: 1 }    // 右下
+  ];
+  
+  for (const dir of directions) {
+    let r = row + dir.dr;
+    let c = col + dir.dc;
+    let hasOpponent = false;
+    
+    // 盤面の範囲内で、隣が相手の駒か確認
+    while (r >= 0 && r < 8 && c >= 0 && c < 8 && boardState[r][c] === -player) {
+      hasOpponent = true;
+      r += dir.dr;
+      c += dir.dc;
+    }
+    
+    // 少なくとも1つの相手の駒があり、その先に自分の駒があるか
+    if (hasOpponent && r >= 0 && r < 8 && c >= 0 && c < 8 && boardState[r][c] === player) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// -------------------------------
+// 駒をひっくり返す関数
+// -------------------------------
+function flipPieces(row, col, player) {
+  const flippedPieces = [];
+  
+  // 8方向をチェック
+  const directions = [
+    { dr: -1, dc: 0 },  // 上
+    { dr: 1, dc: 0 },   // 下
+    { dr: 0, dc: -1 },  // 左
+    { dr: 0, dc: 1 },   // 右
+    { dr: -1, dc: -1 }, // 左上
+    { dr: -1, dc: 1 },  // 右上
+    { dr: 1, dc: -1 },  // 左下
+    { dr: 1, dc: 1 }    // 右下
+  ];
+  
+  for (const dir of directions) {
+    let r = row + dir.dr;
+    let c = col + dir.dc;
+    const toFlip = [];
+    
+    // 盤面の範囲内で、隣が相手の駒か確認
+    while (r >= 0 && r < 8 && c >= 0 && c < 8 && boardState[r][c] === -player) {
+      toFlip.push({ row: r, col: c });
+      r += dir.dr;
+      c += dir.dc;
+    }
+    
+    // 少なくとも1つの相手の駒があり、その先に自分の駒があるか
+    if (toFlip.length > 0 && r >= 0 && r < 8 && c >= 0 && c < 8 && boardState[r][c] === player) {
+      // この方向の駒をひっくり返す
+      for (const pos of toFlip) {
+        // 盤面の状態を更新
+        boardState[pos.row][pos.col] = player;
+        
+        // ボード上の位置を計算
+        const boardX = -0.25 + 0.03125 + (pos.col * 0.0625);
+        const boardZ = -0.25 + 0.03125 + (pos.row * 0.0625);
+        
+        // ボード上の駒を検索
+        let found = false;
+        for (const existingPiece of pieces) {
+          if (
+            Math.abs(existingPiece.position.x - boardX) < 0.01 &&
+            Math.abs(existingPiece.position.z - boardZ) < 0.01
+          ) {
+            // 既存の駒を見つけた
+            found = true;
+            
+            // マテリアルを更新
+            existingPiece.material = player === 1 ?
+              new THREE.MeshPhysicalMaterial({
+                color: 0x111111,
+                metalness: 0.15,
+                roughness: 0.15,
+                reflectivity: 0.6,
+                clearcoat: 0.4,
+                clearcoatRoughness: 0.15
+              }) :
+              new THREE.MeshPhysicalMaterial({
+                color: 0xf5f5f5,
+                metalness: 0.12,
+                roughness: 0.25,
+                reflectivity: 0.8,
+                clearcoat: 0.6,
+                clearcoatRoughness: 0.08
+              });
+            
+            // ユーザーデータを更新
+            existingPiece.userData.player = player;
+            
+            flippedPieces.push(existingPiece);
+            break;
+          }
+        }
+        
+        if (!found) {
+          // 駒が見つからない場合は新しく作成（通常は起こらないはず）
+          const piece = createPiece(player);
+          piece.rotation.x = Math.PI / 2;
+          piece.position.set(boardX, 0.02, boardZ);
+          board.add(piece);
+          pieces.push(piece);
+          flippedPieces.push(piece);
+        }
+      }
+    }
+  }
+  
+  return flippedPieces;
+}
+
+// ページ読み込み時に初期化を呼び出し
+init();
